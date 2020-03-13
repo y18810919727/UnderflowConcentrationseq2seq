@@ -106,10 +106,11 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-scripts
+/scripts/*
 *.ipynb
-/data/
+/data/*
 
-/expresults/
+/expresults/*
 !/scripts/demo.sh
-/document/
+/document/*
+!/data/data_example.csv
