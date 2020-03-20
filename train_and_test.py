@@ -183,9 +183,11 @@ def train_net(net, train_loader, test_loader, config):
                 state = {
                     'net': net.state_dict(),
                     'epoch': epoch,
-                    'optim': optim.state_dict()
+                    'optim': optim.state_dict(),
+                    'scaler_mean': config.scaler.mean_,
+                    'scaler_var': config.scaler.var_
                 }
-                torch.save(state, os.path.join('ckpt', config.save_dir, str(epoch)))
+                torch.save(state, os.path.join('ckpt', config.save_dir, str(epoch))+'.pth')
 
     print('best loss = {:.4f} in epoch = {} with train_loss = {:.4f}'.format(best_loss, best_info[0], best_info[1]))
     return net, train_loss_list, test_loss_list

@@ -26,7 +26,6 @@ from train_and_test import test_net, train_net
 
 
 from matplotlib import pyplot as plt
-DATA_PATH = './data/res_all_selected_features_0.csv'
 
 if config.random_seed is None:
     rand_seed = np.random.randint(0,100000)
@@ -46,9 +45,8 @@ torch.manual_seed(rand_seed)
 torch.cuda.manual_seed(rand_seed)
 
 
-
-data = pd.read_csv(DATA_PATH)
-scaler = StandardScaler().fit(data)
+scaler = config.scaler
+data = pd.read_csv(config.DATA_PATH)
 scaled_data = scaler.transform(data)
 dataset = MyDataset(pd.DataFrame(scaled_data, columns=data.columns, index=data.index),
                     look_back=config.look_back, look_forward=config.look_forward,

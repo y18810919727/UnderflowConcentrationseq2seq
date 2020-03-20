@@ -32,8 +32,10 @@ parser.add_argument('--is_train', type=str, default=False)
 parser.add_argument('--test_all', action='store_true', default=False)
 parser.add_argument('--random_seed', type=int, default=None)
 parser.add_argument('--t_range', type=float, default=10.0)
-parser.add_argument('--rtol', type=str, default='3')
-parser.add_argument('--atol', type=str, default='4')
+parser.add_argument('--rtol', type=str, default='1')
+parser.add_argument('--atol', type=str, default='2')
+parser.add_argument('--DATA_PATH', type=str, default='./data/res_all_selected_features_0.csv')
+
 
 
 
@@ -70,10 +72,17 @@ if args.is_train and args.test_all:
 
 import time
 
-if os.path.exists('logs'):
+if not os.path.exists('logs'):
     os.makedirs('logs')
 args.writer = MyWriter(
     save_path=os.path.join('logs', args.save_dir, str(time.strftime("%Y%m%d%H%M%S", time.localtime()))),
     is_write=args.tb_visualize
+
 )
+
+
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+data = pd.read_csv(args.DATA_PATH)
+args.scaler = StandardScaler().fit(data)
 

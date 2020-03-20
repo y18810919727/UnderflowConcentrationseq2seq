@@ -7,8 +7,8 @@ import json
 import time
 
 import torch
-from torchdiffeq import odeint_adjoint as odeint
-#from torchdiffeq import odeint as odeint
+#from torchdiffeq import odeint_adjoint as odeint
+from torchdiffeq import odeint as odeint
 from torch.nn import RNN
 from models.diff import DiffNet
 from torch import nn
