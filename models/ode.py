@@ -26,23 +26,19 @@ class ODENet(nn.Module):
         self.u_seq = u_seq
 
     def forward(self, t, y):
-        t = torch.clamp(t, 0, config.t_range)
-        self.cum_t += 1
-        u_position = float(self.u_seq.shape[0]*t.cpu()/config.t_range)
-        #u_index = np.array(t.cpu().numpy(), dtype=np.int32)
-        u_index = int(u_position)
+        t_range = config.t_step * (len(self.u_seq) - 1)
 
-        # When ode solver calculate y(t), it needs the gradient of y at (t+dt),so parameter t here may exceeds the max t.
-        if u_index >= self.u_seq.shape[0]:
-            u_index = self.u_seq.shape[0]-1
-            # import pdb
-            # pdb.set_trace()
+        # When ode solver calculate y(t), it needs the gradient of y to (t+dt),so the parameter t may exceeds the t_range.
+        t = torch.clamp(t, 0, t_range)
+        self.cum_t += 1
+        u_position = float((self.u_seq.shape[0] - 1)*t.cpu()/t_range)
+
+        u_index = int(u_position)
+        u_index_plus_one = min(u_index + 1, self.u_seq.shape[0]-1)
+
         u_left = self.u_seq[u_index]
-        u_index_plus_one = u_index + 1
-        if u_index_plus_one >= self.u_seq.shape[0]:
-            u_index_plus_one -= 1
         u_right = self.u_seq[u_index_plus_one]
-        cur_u = u_left + (u_right - u_left) * (t - u_index)
+        cur_u = u_left + (u_right - u_left) * (u_position - u_index)
         #cur_u = cur_u * 0
         if config.use_cuda:
             cur_u = cur_u.cuda()
@@ -90,7 +86,7 @@ class MyODE(DiffNet):
         if config.net_type == 'lstm':
             hn = hn[0]
 
-        t = torch.linspace(0, config.t_range, forward_x.shape[0]+1)
+        t = torch.linspace(0, config.t_step * forward_x.shape[0], forward_x.shape[0]+1)
         if config.use_cuda:
             t = t.cuda()
         self.ode_net.set_u(torch.cat([pre_x[-1:], forward_x], dim=0))

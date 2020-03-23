@@ -53,3 +53,7 @@ def make_fcn(input_size, num_layers, hidden_size, out_size):
         nn.Linear(layer_sizes[-1], out_size)
     )
     return nn.Sequential(*modules_list)
+
+
+def col2Index(all_col, col):
+    return [list(all_col).index(x) for x in col]

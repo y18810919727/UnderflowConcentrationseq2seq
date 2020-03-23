@@ -16,8 +16,8 @@ parser.add_argument('--use_cuda', action='store_true', default=False)
 parser.add_argument('--tb_visualize', action='store_true', default=False, help='write log to ./logs/save_dir')
 parser.add_argument('--plt_visualize', action='store_true', default=False)
 parser.add_argument('--loss_func', type=str, default='L2')
-parser.add_argument('--net_type', type=str, default='lstm')
-parser.add_argument('--algorithm', type=str, default='diff')
+parser.add_argument('--net_type', type=str, default='rnn')
+parser.add_argument('--algorithm', type=str, default='ode')
 parser.add_argument('--hidden_num', type=int, default=32)
 parser.add_argument('--num_layers', type=int, default=1)
 parser.add_argument('--look_back', type=int, default=120)
@@ -31,10 +31,20 @@ parser.add_argument('--test_model', type=str, default='0')
 parser.add_argument('--is_train', type=str, default=False)
 parser.add_argument('--test_all', action='store_true', default=False)
 parser.add_argument('--random_seed', type=int, default=None)
-parser.add_argument('--t_range', type=float, default=10.0)
+parser.add_argument('--t_step', type=float, default=10.0/60)
 parser.add_argument('--rtol', type=str, default='1')
 parser.add_argument('--atol', type=str, default='2')
 parser.add_argument('--DATA_PATH', type=str, default='./data/res_all_selected_features_0.csv')
+
+parser.add_argument('--con_algorithm', type=str, default='synchronous')
+parser.add_argument('--min_future_length', type=int, default=1000)
+parser.add_argument('--con_t_range', type=float, default=1000*10.0/60)
+parser.add_argument('--controllable', type=list, default=['5','7','15'])
+parser.add_argument('--uncontrollable', type=list, default=['4', '16'])
+parser.add_argument('--con_batch_size', type=int, default=1)
+parser.add_argument('--all_col', type=list, default=['1','4','5','7','11','15','16','17','18','19','20','21','22'])
+
+
 
 
 
