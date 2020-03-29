@@ -6,3 +6,8 @@ import os
 import json
 
 import torch
+
+class SynchronousController:
+
+    def __init__(self,
+                 ):

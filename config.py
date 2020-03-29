@@ -11,14 +11,14 @@ import argparse
 from common import MyWriter
 DATA_PATH = './data/res_all_selected_features_0.csv'
 
-parser = argparse.ArgumentParser(description='seq2seq Data-driven Thickener Simulater')
+parser = argparse.ArgumentParser(description='seq2seq Data-driven Thickener Simulator')
 parser.add_argument('--use_cuda', action='store_true', default=False)
 parser.add_argument('--tb_visualize', action='store_true', default=False, help='write log to ./logs/save_dir')
 parser.add_argument('--plt_visualize', action='store_true', default=False)
 parser.add_argument('--loss_func', type=str, default='L2')
-parser.add_argument('--net_type', type=str, default='rnn')
+parser.add_argument('--net_type', type=str, default='lstm')
 parser.add_argument('--algorithm', type=str, default='ode')
-parser.add_argument('--hidden_num', type=int, default=32)
+parser.add_argument('--hidden_num', type=int, default=16)
 parser.add_argument('--num_layers', type=int, default=1)
 parser.add_argument('--look_back', type=int, default=120)
 parser.add_argument('--look_forward', type=int, default=60)
