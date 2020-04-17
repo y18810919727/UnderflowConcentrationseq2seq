@@ -37,6 +37,14 @@ class MyWriter(SummaryWriter):
         if self.is_write:
             SummaryWriter.add_figure(self, tag, figure, global_step, close, walltime)
 
+    def close(self):
+
+        if self.is_write:
+            SummaryWriter.add_figure(self)
+        else:
+            pass
+
+
 
 def make_fcn(input_size, num_layers, hidden_size, out_size):
 
