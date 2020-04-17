@@ -10,6 +10,8 @@ import torch
 import argparse
 from common import MyWriter
 DATA_PATH = './data/res_all_selected_features_0.csv'
+# DATA_PATH = './data/data_example.csv'
+
 
 parser = argparse.ArgumentParser(description='seq2seq Data-driven Thickener Simulator')
 parser.add_argument('--use_cuda', action='store_true', default=False)
@@ -37,20 +39,13 @@ parser.add_argument('--atol', type=str, default='2')
 parser.add_argument('--DATA_PATH', type=str, default='./data/res_all_selected_features_0.csv')
 
 parser.add_argument('--con_algorithm', type=str, default='synchronous')
-parser.add_argument('--min_future_length', type=int, default=1000)
+parser.add_argument('--min_future_length', type=int, default=3000)
 parser.add_argument('--con_t_range', type=float, default=1000*10.0/60)
 parser.add_argument('--controllable', type=list, default=['5','7','15'])
 parser.add_argument('--uncontrollable', type=list, default=['4', '16'])
 parser.add_argument('--con_batch_size', type=int, default=1)
 parser.add_argument('--all_col', type=list, default=['1','4','5','7','11','15','16','17','18','19','20','21','22'])
-
-
-
-
-
-
-
-
+parser.add_argument('--y_target', type=list, default=[60, 50])
 
 
 args = parser.parse_args()
