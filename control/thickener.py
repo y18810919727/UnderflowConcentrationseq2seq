@@ -6,13 +6,13 @@ import os
 import json
 
 import torch
+from torch.autograd import Variable
 from config import args as config
 import pandas
 from control.scaler import MyScaler
 from custom_dataset import Target_Col
 from custom_dataset import Control_Col
 from torchdiffeq import odeint
-
 from common import col2Index
 
 class Thickener():
@@ -79,6 +79,18 @@ class Thickener():
             dim=1
         )
 
+        self.c = self.c_u_seq[0][:, self.uncontrollable_in_input_index]
+
+
+    def update_c_u_seq(self, u):
+        # 寻找当前生成c的下标
+        self.input_position = int(self.t / config.t_step)
+        # 更新指定下标位置及相邻写一个位置的外部输入量u
+        self.c_u_seq[self.input_position, :, self.controllable_in_input_index] = u
+        self.c = self.c_u_seq[self.input_position][:, self.uncontrollable_in_input_index]
+
+        if self.input_position + 1 < len(self.c_u_seq):
+            self.c_u_seq[self.input_position + 1, :, self.controllable_in_input_index] = u
 
     def f(self, u):
         """
@@ -86,19 +98,24 @@ class Thickener():
         :param u: (bs, m) or (m,)
         :return: x(t+T), x对时间的导数
         """
-
         if u.shape is (self.m,):
             u = u.unsqueeze(dim=0)
 
         assert self.batch_size == u.shape[0]
 
-        # 寻找当前生成c的下标
-        input_position = int(self.t / config.t_step)
+        self.update_c_u_seq(u)
 
-        # 更新指定下标位置及相邻写一个位置的外部输入量u
-        self.c_u_seq[input_position, :, self.controllable_in_input_index] = u
-        if input_position + 1 < len(self.c_u_seq):
-            self.c_u_seq[input_position + 1, :, self.controllable_in_input_index] = u
+        # 计算f_u_grad
+        ode_input = Variable(torch.cat((self.x, self.c_u_seq[self.input_position]), dim=1), requires_grad=True)
+        ode_ouput = self.ode_net.grad_module(ode_input)
+        jacT = torch.zeros(ode_input.shape[1], ode_ouput.shape[1])
+        for i in range(ode_ouput.shape[1]):
+            gradients = torch.zeros(1, ode_ouput.shape[1])
+            gradients[:, i] = 1
+            j = torch.autograd.grad(ode_ouput, ode_input, grad_outputs=gradients, retain_graph=True)
+            jacT[:, i:i + 1] = j[0].T
+        f_u_index = [i+16 for i in self.controllable_in_input_index]
+        f_u_grad = jacT[f_u_index, :]
 
         # 更新ode求解模型中的控制输入序列
         self.ode_net.set_u(self.c_u_seq)
@@ -109,11 +126,14 @@ class Thickener():
 
         # 拿出t时刻顺时的外部变化量，用于计算x的顺时导数
         cur_c_u = linear_fit(
-            self.c_u_seq[input_position],
-            self.c_u_seq[min(input_position+1, len(self.c_u_seq) - 1)],
-            (self.t - config.t_step * input_position) / config.t_step
+            self.c_u_seq[self.input_position],
+            self.c_u_seq[min(self.input_position+1, len(self.c_u_seq) - 1)],
+            (self.t - config.t_step * self.input_position) / config.t_step
         )
         t = torch.FloatTensor([self.t, self.t+self.T])
+
+        self.last_x = self.x
+
         with torch.no_grad():
             # 计算导数
             dx_dt = self.ode_net.grad_module(torch.cat([self.x, cur_c_u], dim=1))
@@ -121,16 +141,17 @@ class Thickener():
             self.x = odeint(self.ode_net, self.x, t, rtol=config.rtol, atol=config.atol)[1]
 
         self.t += self.T
-        return self.x, dx_dt
+        return self.x, dx_dt, f_u_grad
 
 
     def initial_hidden_state(self, random_seed, scaled_data):
 
 
         np.random.seed(random_seed)
-
+        print('random_seed:' + str(random_seed))
         # 定义batch_size 个随机起点
         begin_index = np.random.randint(0, self.length - config.look_back + 1 - config.min_future_length, self.batch_size)
+        # begin_index = np.random.randint(0, 10, self.batch_size)
 
         # 拿出历史数据，准备使用rnn编码
         y = [torch.FloatTensor(scaled_data[ind:ind+config.look_back, self.target_index]) for ind in begin_index]
@@ -150,6 +171,7 @@ class Thickener():
         # The shape of hn is (num_layers, batch_size, hidden_num ). Here, it assumes num_layers is equal to 1.
 
         return hn[0], begin_index+config.look_back-1
+
 
 
 

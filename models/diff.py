@@ -45,7 +45,7 @@ class DiffNet(Module):
     def parameters_init(self):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.Linear)):
-                nn.init.orthogonal(m.weight)
+                nn.init.orthogonal_(m.weight)
 
     def forward(self, input):
         """
