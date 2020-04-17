@@ -114,3 +114,4 @@ venv.bak/
 !/scripts/demo.sh
 /document/*
 !/data/data_example.csv
+/ckpt/add_scaler.py

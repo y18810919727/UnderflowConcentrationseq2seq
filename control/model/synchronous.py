@@ -81,7 +81,7 @@ class SynchronousController:
 
     def df_du_fun(self, u, w):
         """
-        计算 f对u的倒数 * w
+        计算 f对u的导数 * w
         :param u:
         :param w: phi @ W_2
         :return: f_u_grad
