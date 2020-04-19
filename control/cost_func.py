@@ -47,12 +47,12 @@ class QuadraticCost(CostFuncBase):
             # 03.29更新：直接拿归一化的数据计算cost更方便，跑出实验后做曲线可视化时再反归一化回来
             # 这些参数我目前是随机定的，可以根据实验结果微调
             config = {
-                'Q': torch.diag(torch.FloatTensor([1.0, 0.01])),
-                'R': torch.diag(torch.FloatTensor([0.01, 0.01, 0.01])),
+                'Q': torch.diag(torch.FloatTensor([1.0, 0.1])),
+                'R': torch.diag(torch.FloatTensor([0.1, 0.2, 0.1])),
                 'u_mid': torch.FloatTensor([0, 0, 0]),
                 'n': 2,
                 'm': 3,
-                'EPS': 1e-3,
+                'EPS': 1e-5,
             }
         super(QuadraticCost, self).__init__(fcn, config)
 
@@ -74,15 +74,17 @@ class QuadraticCost(CostFuncBase):
     def solve_partial_equation(self, w, df_du_func, last_u):
         u = last_u
         i = 0
+        last_dist = torch.FloatTensor([0])
         while True:
             i += 1
             u_grad = df_du_func(u, w)
             # print(u_grad.data)
-            new_u = u_grad.matmul(self.R.inverse()) / 2
-            # print(new_u.data)
-            # new_u = u - u_grad.matmul(self.R)
+            new_u = - u_grad.matmul(self.R.inverse()) / 2
+            print(str(new_u.data))
             if torch.dist(new_u, u) < self.config['EPS']:
                 break
+            last_dist = torch.dist(new_u, u)
+            # print(str(torch.dist(new_u, u).data))
             if i > 2000:
                 break
             u = new_u

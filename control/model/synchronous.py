@@ -99,6 +99,7 @@ class SynchronousController:
     def train(self):
 
         u = torch.rand(1, 3)
+
         for step in range(self.step_max):
             x, x_grad, f_u_grad = self.evn.f(u)
 

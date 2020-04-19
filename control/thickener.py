@@ -21,7 +21,7 @@ class Thickener():
                  model,
                  scaler: MyScaler,
                  random_seed=None,
-                 T=0.01,
+                 T= 0.01,
                  m=3,
                  batch_size=1
                  ):

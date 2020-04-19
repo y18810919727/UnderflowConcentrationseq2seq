@@ -45,7 +45,7 @@ parser.add_argument('--controllable', type=list, default=['5','7','15'])
 parser.add_argument('--uncontrollable', type=list, default=['4', '16'])
 parser.add_argument('--con_batch_size', type=int, default=1)
 parser.add_argument('--all_col', type=list, default=['1','4','5','7','11','15','16','17','18','19','20','21','22'])
-parser.add_argument('--y_target', type=list, default=[60, 50])
+parser.add_argument('--y_target', type=list, default=[60, 45])
 
 
 args = parser.parse_args()
