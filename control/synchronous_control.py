@@ -12,7 +12,10 @@ from control.cost_func import QuadraticCost
 from control.model.synchronous import SynchronousController
 
 # 载入pth
-state_dic = torch.load('./ckpt/lstm_ode_4_5/95.pth')
+#state_dic = torch.load('./ckpt/lstm_ode_4_5/95.pth')
+# 更新使用的仿真模型
+state_dic = torch.load('./ckpt/rnn_ode_2_3_nobias/best.pth')
+
 
 from models.ode import MyODE
 
