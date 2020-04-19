@@ -169,7 +169,7 @@ def train_net(net, train_loader, test_loader, config):
         if epoch % config.test_period == config.test_period - 1:
 
             total_test_loss, _ = test_net(net, test_loader, use_cuda, critic, epoch=epoch,
-                                          plt_visualize=config.plt_visualize, tb_visualize=config.tb_visualize)
+                                          plt_visualize=config.plt_visualize, tb_visualize=config.tb)
 
             #print('test loss after {} epoch is {:.2f}'.format(epoch+1, total_test_loss))
             writer.add_scalar('test_loss', total_test_loss, epoch)
@@ -187,8 +187,14 @@ def train_net(net, train_loader, test_loader, config):
                     'scaler_mean': config.scaler.mean_,
                     'scaler_var': config.scaler.var_
                 }
-                torch.save(state, os.path.join('ckpt', config.save_dir, str(epoch))+'.pth')
 
+                # just save the best model parameters
+                best_state =state
+                # torch.save(state, os.path.join('ckpt', config.save_dir, str(epoch))+'.pth')
+
+
+
+    torch.save(best_state, os.path.join('ckpt', config.save_dir, 'best')+'.pth')
     print('best loss = {:.4f} in epoch = {} with train_loss = {:.4f}'.format(best_loss, best_info[0], best_info[1]))
     return net, train_loss_list, test_loss_list
 

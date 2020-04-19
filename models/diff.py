@@ -36,9 +36,9 @@ class DiffNet(Module):
     def fc_init(self, hidden_size, out_size):
 
         fc = torch.nn.Sequential(
-            torch.nn.Linear(hidden_size, hidden_size),
+            torch.nn.Linear(hidden_size, hidden_size, bias=False),
             torch.nn.Tanh(),
-            torch.nn.Linear(hidden_size, out_size)
+            torch.nn.Linear(hidden_size, out_size, bias=False),
         )
         return fc
 
