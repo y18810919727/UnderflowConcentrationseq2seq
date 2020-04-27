@@ -7,7 +7,7 @@ import json
 
 from torch import nn
 import torch
-from torch.nn import RNN, Module, LSTM
+from torch.nn import RNN, Module, LSTM, GRU
 
 class DiffNet(Module):
     def __init__(self, input_size, num_layers, hidden_size, out_size, net_type='lstm'):
@@ -18,19 +18,22 @@ class DiffNet(Module):
         :param outsize: y's shape
         """
         super(DiffNet, self).__init__()
-        self.rnn = self.rnn_init(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size, net_type=net_type)
+        self.rnn = self.rnn_init(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
 
         self.fc = self.fc_init(hidden_size=hidden_size, out_size=out_size)
 
         self.parameters_init()
 
-    def rnn_init(self, input_size, num_layers, hidden_size, net_type='lstm'):
-        if net_type == 'rnn':
-            rnn = RNN(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
-        elif net_type == 'lstm':
-            rnn = LSTM(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
-        else:
-            raise ValueError("can not identify net_type.")
+    def rnn_init(self, input_size, num_layers, hidden_size):
+
+        rnn = RNN(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
+        # if net_type == 'rnn':
+        # elif net_type == 'lstm':
+        #     rnn = LSTM(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
+        # elif net_type == 'GRU':
+        #     rnn = GRU(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
+        # else:
+        #     raise ValueError("can not identify net_type.")
         return rnn
 
     def fc_init(self, hidden_size, out_size):

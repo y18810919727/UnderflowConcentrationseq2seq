@@ -68,6 +68,7 @@ class MyODE(DiffNet):
         modules_list.append(
             nn.Linear(layer_sizes[-1], hidden_size)
         )
+
         self.ode_net = ODENet(
             nn.Sequential(*modules_list)
         )
@@ -93,7 +94,7 @@ class MyODE(DiffNet):
         self.ode_net.cum_t = 0
         time_beg = time.time()
         hn_all = odeint(self.ode_net, hn[0], t, rtol=config.rtol, atol=config.atol)[1:]
-        print('forward %i %f s' % (self.ode_net.cum_t, time.time() - time_beg))
+        #print('forward %i %f s' % (self.ode_net.cum_t, time.time() - time_beg))
 
         estimate_y_all = self.recursive_predict(hn_all, max_len=50)
         return estimate_y_all

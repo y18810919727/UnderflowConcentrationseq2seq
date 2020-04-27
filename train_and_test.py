@@ -9,23 +9,34 @@ from tqdm import tqdm
 import torch
 import time
 from matplotlib import pyplot as plt
-from config import args as config
+import copy
 from custom_dataset import Target_Col
 from tensorboardX import SummaryWriter
+from common import RRSE
 
 
-def test_net(net, test_loader, use_cuda, loss_func=None, epoch=0, plt_visualize=False, tb_visualize=False):
+def test_net(net, test_loader, config, critic_func=None, epoch=0, plt_visualize=False, tb_visualize=False):
 
-    if loss_func is None:
-        loss_func = torch.nn.MSELoss()
+    if critic_func is None:
+        critic_func = torch.nn.MSELoss()
+    total_test_items, acc_time = 0, 0
+
+    if type(critic_func) is dict and len(critic_func) >=2:
+        metrics = {}
+        for key, func in critic_func.items():
+            metric, total_test_items, acc_time = test_net(net, test_loader, config, func, epoch, plt_visualize, tb_visualize)
+            metrics[key] = metric
+        return metrics, total_test_items, acc_time
+
     net.eval()
     total_test_loss = 0
     total_test_items = 0
 
-    use_cuda = use_cuda if torch.cuda.is_available() else False
+    use_cuda = config.use_cuda if torch.cuda.is_available() else False
     if use_cuda:
         net = net.cuda()
 
+    acc_time = 0
     for i, data in enumerate(test_loader):
         pre_x, pre_y, forward_x, forward_y = data
         pre_x = pre_x.permute(1,0,2)
@@ -38,8 +49,12 @@ def test_net(net, test_loader, use_cuda, loss_func=None, epoch=0, plt_visualize=
             forward_x = forward_x.cuda()
             forward_y = forward_y.cuda()
 
+        cur_time = time.time()
         y_estimate_all = net((pre_x, pre_y, forward_x))
-        test_loss = loss_func(y_estimate_all, forward_y)
+        used_time = time.time() - cur_time
+        acc_time += used_time
+
+        test_loss = critic_func(y_estimate_all, forward_y)
         total_test_loss += float(test_loss) * pre_x.shape[1]
         total_test_items += pre_x.shape[1]
 
@@ -78,6 +93,7 @@ def test_net(net, test_loader, use_cuda, loss_func=None, epoch=0, plt_visualize=
 
         if plt_visualize and pre_x.shape[1]>=3:
             plt.figure(figsize=(10, 6))
+
             for y_index in range(len(Target_Col)):
                 for series_index in range(min(config.batch_size, 3)):
                     plt.subplot('33'+str(series_index+y_index*3+1))
@@ -89,28 +105,32 @@ def test_net(net, test_loader, use_cuda, loss_func=None, epoch=0, plt_visualize=
             plt.show()
 
     total_test_loss /= total_test_items
-    return total_test_loss, total_test_items
+    return total_test_loss, total_test_items, acc_time
 
-def train_net(net, train_loader, test_loader, config):
+def train_net(net, train_loader, val_loader, config):
 
     train_loss_list = []
-    test_loss_list = []
+    val_RRSE_list = []
 
     use_cuda = config.use_cuda if torch.cuda.is_available() else False
     if use_cuda:
         net = net.cuda()
 
-    optim = torch.optim.Adam(net.parameters())
-    schedualer = torch.optim.lr_scheduler.StepLR(optim, step_size=5, gamma=0.9, last_epoch=-1)
 
     if config.loss_func == 'L2':
         critic = torch.nn.MSELoss()
-    else:
-        critic = torch.nn.MSELoss()
+    elif config.loss_func == 'gauss':
+        from common import GaussLoss
+        critic = GaussLoss(len(Target_Col), config)
+        sigma_optim = torch.optim.Adam([critic.sigma])
+
+
+    optim = torch.optim.Adam(net.parameters(), lr=5e-4)
+    schedualer = torch.optim.lr_scheduler.StepLR(optim, step_size=2, gamma=0.95, last_epoch=-1)
 
     writer = config.writer
 
-    best_loss = 1e8
+    best_RRSE = 1e8
     best_info = (-1,1e8)
     bar = tqdm(total=config.epochs*len(train_loader))
 
@@ -140,18 +160,24 @@ def train_net(net, train_loader, test_loader, config):
             loss = critic(y_estimate_all, forward_y)
             total_train_loss += float(loss)*pre_x.shape[1]
             total_train_items += pre_x.shape[1]
+
             optim.zero_grad()
+
+            if config.loss_func == 'gauss':
+                sigma_optim.zero_grad()
+
+
             if 'ode' in config.algorithm:
                 net.ode_net.cum_t = 0
                 time_beg = time.time()
                 loss.backward()
-                print('backward %i %f s' % (net.ode_net.cum_t, time.time() - time_beg))
+                #print('backward %i %f s' % (net.ode_net.cum_t, time.time() - time_beg))
             else:
                 loss.backward()
 
-
-
             optim.step()
+            if config.loss_func == 'gauss':
+                sigma_optim.step()
 
             # write to tensorboard
 
@@ -162,26 +188,31 @@ def train_net(net, train_loader, test_loader, config):
 
 
         writer.add_scalar('train_loss', total_train_loss/total_train_items, epoch)
+        if config.loss_func =='gauss':
+            for i in range(critic.sigma.shape[0]):
+                writer.add_scalar('sigma'+str(i), float(critic.get_cov()[i,i].cpu()), epoch)
         train_loss_list.append(total_train_loss/total_train_items)
         #print('train loss after {} epoch is {:.2f}'.format(epoch+1, total_train_loss/total_train_items))
         schedualer.step()
 
         if epoch % config.test_period == config.test_period - 1:
 
-            total_test_loss, _ = test_net(net, test_loader, use_cuda, critic, epoch=epoch,
+            total_val_metrics, _, acc_time = test_net(net, val_loader, config, {'RRSE': RRSE, 'MSE': torch.nn.MSELoss()}, epoch=epoch,
                                           plt_visualize=config.plt_visualize, tb_visualize=config.tb)
 
-            #print('test loss after {} epoch is {:.2f}'.format(epoch+1, total_test_loss))
-            writer.add_scalar('test_loss', total_test_loss, epoch)
-            test_loss_list.append(total_test_loss)
+            total_val_RRSE = total_val_metrics['RRSE']
+            total_val_MSE = total_val_metrics['MSE']
+            #print('val loss after {} epoch is {:.2f}'.format(epoch+1, total_val_loss))
 
-            if not os.path.exists('./ckpt/'+config.save_dir):
-                os.makedirs('./ckpt/'+config.save_dir)
-            if total_test_loss < best_loss:
-                best_loss = min(total_test_loss, best_loss)
+            writer.add_scalar('val_RRSE', total_val_RRSE, epoch)
+            writer.add_scalar('val_MSE', total_val_MSE, epoch)
+            val_RRSE_list.append(total_val_RRSE)
+
+            if total_val_RRSE < best_RRSE:
+                best_RRSE = min(total_val_RRSE, best_RRSE)
                 best_info = (epoch, total_train_loss/total_train_items)
                 state = {
-                    'net': net.state_dict(),
+                    'net':  copy.deepcopy(net).state_dict(),
                     'epoch': epoch,
                     'optim': optim.state_dict(),
                     'scaler_mean': config.scaler.mean_,
@@ -192,9 +223,9 @@ def train_net(net, train_loader, test_loader, config):
                 best_state =state
                 # torch.save(state, os.path.join('ckpt', config.save_dir, str(epoch))+'.pth')
 
-
-
+    if not os.path.exists('./ckpt/'+config.save_dir):
+        os.makedirs('./ckpt/'+config.save_dir)
     torch.save(best_state, os.path.join('ckpt', config.save_dir, 'best')+'.pth')
-    print('best loss = {:.4f} in epoch = {} with train_loss = {:.4f}'.format(best_loss, best_info[0], best_info[1]))
-    return net, train_loss_list, test_loss_list
+    print('best loss = {:.4f} in epoch = {} with train_loss = {:.4f}'.format(best_RRSE, best_info[0], best_info[1]))
+    return net, train_loss_list, val_RRSE_list
 
