@@ -43,6 +43,8 @@ class HiddenRNN(DiffNet):
         """
         pre_x, pre_y, forward_x = input
         output, hn = self.rnn(torch.cat([pre_x, pre_y], dim=2))
+        if config.net_type =='lstm':
+            hn = (hn, torch.zeros_like(hn))
 
 
         estimate_y_list = []

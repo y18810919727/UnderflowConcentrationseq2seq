@@ -17,7 +17,8 @@ import common
 from config import args as config
 from models.model_generator import initialize_model
 
-model_dir = 'rnn_ode_2_3_h32'
+#model_dir = 'rnn_ode_2_3_h32'
+model_dir = 'rnn_ode_affine_2_3_h16'
 model_name = 'best.pth'
 
 # 载入pth
