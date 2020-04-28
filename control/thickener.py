@@ -14,6 +14,7 @@ from custom_dataset import Target_Col
 from custom_dataset import Control_Col
 from torchdiffeq import odeint
 from common import col2Index
+from decimal import Decimal
 
 class Thickener():
 
@@ -21,7 +22,7 @@ class Thickener():
                  model,
                  scaler: MyScaler,
                  random_seed=None,
-                 T= 0.01,
+                 T= 0.10,
                  m=3,
                  batch_size=1
                  ):
@@ -46,7 +47,7 @@ class Thickener():
         self.rnn = model.rnn
         self.ode_net = model.ode_net
         self.m = m
-
+        self.fcn = model.fc
         self.scaler = scaler
 
         ori_data = np.array(pandas.read_csv(config.DATA_PATH))
@@ -74,10 +75,15 @@ class Thickener():
         # begin_index: (batch_size), 记录位置用于后续生成外部噪音c
         self.x, self.begin_index = self.initial_hidden_state(self.random_seed, self.scaled_data)
 
+        print('begin_index:' + str(self.begin_index))
+
         self.c_u_seq = torch.stack(
             [torch.FloatTensor(self.scaled_data[ind:ind+config.min_future_length, self.input_index]) for ind in self.begin_index],
             dim=1
         )
+
+        if config.constant_noise > 0:
+            self.c_u_seq[:, :, self.uncontrollable_in_input_index] = self.c_u_seq[0, 0, self.uncontrollable_in_input_index]
 
         self.c = self.c_u_seq[0][:, self.uncontrollable_in_input_index]
 
@@ -108,6 +114,8 @@ class Thickener():
         # 计算f_u_grad
         ode_input = Variable(torch.cat((self.x, self.c_u_seq[self.input_position]), dim=1), requires_grad=True)
         ode_ouput = self.ode_net.grad_module(ode_input)
+        if config.x_decode > 0:
+            ode_ouput = self.fcn(ode_ouput)
         jacT = torch.zeros(ode_input.shape[1], ode_ouput.shape[1])
         for i in range(ode_ouput.shape[1]):
             gradients = torch.zeros(1, ode_ouput.shape[1])
@@ -140,7 +148,14 @@ class Thickener():
             # 计算t+T时刻的系统状态1
             self.x = odeint(self.ode_net, self.x, t, rtol=config.rtol, atol=config.atol)[1]
 
-        self.t += self.T
+        self.t = Decimal(str(self.t)) + Decimal(str(self.T))
+        self.t = float(str(self.t))
+
+        if config.x_decode > 0:
+            self.x_decode = self.fcn(self.x).data
+            dx_dt = self.fcn(dx_dt).data
+            return self.x_decode, dx_dt, f_u_grad
+
         return self.x, dx_dt, f_u_grad
 
 
@@ -148,7 +163,6 @@ class Thickener():
 
 
         np.random.seed(random_seed)
-        print('random_seed:' + str(random_seed))
         # 定义batch_size 个随机起点
         begin_index = np.random.randint(0, self.length - config.look_back + 1 - config.min_future_length, self.batch_size)
         # begin_index = np.random.randint(0, 10, self.batch_size)
@@ -156,8 +170,8 @@ class Thickener():
         # 拿出历史数据，准备使用rnn编码
         y = [torch.FloatTensor(scaled_data[ind:ind+config.look_back, self.target_index]) for ind in begin_index]
         u = [torch.FloatTensor(scaled_data[ind:ind+config.look_back, self.input_index]) for ind in begin_index]
-        y = torch.stack(y,dim=1)
-        u = torch.stack(u,dim=1)
+        y = torch.stack(y, dim=1)
+        u = torch.stack(u, dim=1)
 
         historical_series = torch.cat([u, y],dim=2)
 

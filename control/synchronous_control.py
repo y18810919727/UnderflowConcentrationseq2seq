@@ -13,6 +13,7 @@ from control.model.synchronous import SynchronousController
 
 # 载入pth
 #state_dic = torch.load('./ckpt/lstm_ode_4_5/95.pth')
+
 # 更新使用的仿真模型
 state_dic = torch.load('./ckpt/rnn_ode_2_3_nobias/best.pth')
 
@@ -32,6 +33,6 @@ my_scaler = MyScaler(_mean, _var, Target_Col, Control_Col, config.controllable, 
 thickener = Thickener(net, my_scaler, None)
 quadratic_cost = QuadraticCost(fcn=net.fc)
 quadratic_cost.y_target = my_scaler.scale_target(torch.FloatTensor(config.y_target))
-synchronous_controller = SynchronousController(evn=thickener, scaler=my_scaler, dim_x_c=config.hidden_num+2, quadratic_cost=quadratic_cost)
+synchronous_controller = SynchronousController(evn=thickener, scaler=my_scaler, quadratic_cost=quadratic_cost)
 
 synchronous_controller.train()
