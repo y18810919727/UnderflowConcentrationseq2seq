@@ -6,25 +6,37 @@ import json
 import torch
 from control.thickener import Thickener
 from custom_dataset import Control_Col, Target_Col
-from config import args as config
 from control.scaler import MyScaler
 from control.cost_func import QuadraticCost
 from control.model.synchronous import SynchronousController
+import common
 
-# 载入pth
 #state_dic = torch.load('./ckpt/lstm_ode_4_5/95.pth')
 
 # 更新使用的仿真模型
-state_dic = torch.load('./ckpt/rnn_ode_2_3_nobias/best.pth')
+
+from config import args as config
+from models.model_generator import initialize_model
+
+#model_dir = 'rnn_ode_2_3_h32'
+model_dir = 'rnn_ode_affine_2_3_h16'
+model_name = 'best.pth'
+
+# 载入pth
+state_dic = torch.load(
+    os.path.join('./ckpt', model_dir, model_name ))
+assert common.parser_dir(model_dir, config)
+print(config)
+net = initialize_model(config)
+net.load_state_dict(state_dic['net'])
 
 
-from models.ode import MyODE
 
 # 与预测建模的实验公用config
-net = MyODE(input_size=len(Target_Col+Control_Col),
-            num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(Target_Col), net_type=config.net_type)
-
-net.load_state_dict(state_dic['net'])
+# net = MyODE(input_size=len(Target_Col+Control_Col),
+#             num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(Target_Col), net_type=config.net_type)
+#
+# net.load_state_dict(state_dic['net'])
 
 # 自定义数据归一化工具
 _mean, _var = state_dic['scaler_mean'], state_dic['scaler_var']

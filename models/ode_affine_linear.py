@@ -26,9 +26,9 @@ class MyODEAffine(MyODE):
         self.f = make_fcn(hidden_size, 1, 16, hidden_size)
         self.g = make_fcn(hidden_size, 1, 16, hidden_size * len(Control_Col))
 
-        class GradidentMoudle(nn.Module):
+        class AffineGradientMoudle(nn.Module):
             def __init__(self, f, g, x_size, u_size):
-                super(GradidentMoudle, self).__init__()
+                super(AffineGradientMoudle, self).__init__()
                 self.f = f
                 self.g = g
                 self.x_size = x_size
@@ -46,5 +46,5 @@ class MyODEAffine(MyODE):
                 return self.f(x) + torch.matmul(self.g(x).contiguous().view(-1, self.x_size, self.u_size),
                                                 u.contiguous().view(-1, self.u_size, 1)).squeeze(-1)
 
-        self.ode_net = ODENet(GradidentMoudle(self.f, self.g, hidden_size, len(Control_Col)))
+        self.ode_net = ODENet(AffineGradientMoudle(self.f, self.g, hidden_size, len(Control_Col)))
 
