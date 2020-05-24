@@ -67,22 +67,28 @@ class MPC_Control:
 
 
 if __name__ == '__main__':
-    #model_dir = 'rnn_ode_2_3_h32'
-    model_dir = 'rnn_ode_affine_2_3_h16'
-    model_name = 'best.pth'
+    # 注意1：这里提供了三个模型，一个affine的，两个普通的，旧的模型不能用了
+    # state_dic = torch.load('./ckpt/rnn_ode_3_4_h32_cubic_transform_dopri5/best.pth')
+    # state_dic = torch.load('./ckpt/GRU_ode_3_4_h32_cubic_dopri5/best.pth')
+    state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_transform/best.pth')
 
-    # 载入pth
-    state_dic = torch.load(
-        os.path.join('./ckpt', model_dir, model_name ))
-    assert common.parser_dir(model_dir, config)
     print(config)
-    net = initialize_model(config)
+    from models.model_generator import initialize_model
+
+    # 保存的pth文件中直接记录着当时训练模型时的config字典
+    model_config = state_dic['config']
+
+    net = initialize_model(config=model_config)
+
+    # net = MyODE(input_size=len(Target_Col+Control_Col),
+    #             num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(Target_Col), net_type=config.net_type)
     net.load_state_dict(state_dic['net'])
+    net.ode_net.interpolation_kind = 'slinear'
 
     _mean, _var = state_dic['scaler_mean'], state_dic['scaler_var']
-    my_scaler = MyScaler(_mean, _var, Target_Col, Control_Col, config.controllable, config.uncontrollable)
+    my_scaler = MyScaler(_mean, _var, model_config.all_col, Target_Col, Control_Col, config.controllable, config.uncontrollable)
 
-    thickener = Thickener(net, my_scaler, None)
+    thickener = Thickener(net, my_scaler, None, config=model_config)
 
     pso = PSO(dim=3, size=50, iter_num=10, evn=thickener, x_max=0.5, max_vel=0.3, best_fitness_value=100)
     # pso = PSO(dim=3, size=50, iter_num=10, evn=thickener, x_max=10, max_vel=5, best_fitness_value=100)

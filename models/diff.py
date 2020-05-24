@@ -10,7 +10,7 @@ import torch
 from torch.nn import RNN, Module, LSTM, GRU
 
 class DiffNet(Module):
-    def __init__(self, input_size, num_layers, hidden_size, out_size, net_type='lstm'):
+    def __init__(self, input_size, num_layers, hidden_size, out_size, config, net_type='lstm'):
         """
 
         :param input_size: x's shape
@@ -18,6 +18,9 @@ class DiffNet(Module):
         :param outsize: y's shape
         """
         super(DiffNet, self).__init__()
+        self.config = config
+
+        self.net_type = net_type
         self.rnn = self.rnn_init(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
 
         self.fc = self.fc_init(hidden_size=hidden_size, out_size=out_size)
@@ -26,7 +29,45 @@ class DiffNet(Module):
 
     def rnn_init(self, input_size, num_layers, hidden_size):
 
-        rnn = RNN(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
+        if self.config.begin == 'rnn_st':
+            rnn = RNN(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
+        elif self.config.begin == 'lstm_st':
+
+            class SingleLSTM(nn.Module):
+
+                def __init__(self, _input_size, _num_layers, _hidden_size):
+                    super(SingleLSTM, self).__init__()
+                    self.lstm = LSTM(input_size=_input_size, num_layers=_num_layers, hidden_size=_hidden_size)
+
+                def forward(self, input, hx=None):
+                    output, hn = self.lstm(input, hx)
+                    return output, hn[0]
+            rnn = SingleLSTM(_input_size=input_size, _num_layers=num_layers, _hidden_size=hidden_size)
+
+        elif self.config.begin == 'GRU_st':
+            rnn = GRU(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
+
+        elif self.config.begin in ['learn_st', 'zero_st']:
+            class InitialHidden(nn.Module):
+
+                def __init__(self, hidden_size, keep_zero):
+                    super(InitialHidden, self).__init__()
+                    self.hidden_size = hidden_size
+                    self.begin_state = torch.nn.Parameter(torch.randn(hidden_size))
+                    self.keep_zero = keep_zero
+                def forward(self, x):
+                    _, bs, _=x.shape
+                    hn = self.begin_state.repeat(bs, 1).unsqueeze(dim=0).to(x.device)
+                    if self.keep_zero:
+                        hn = hn *0
+                    output = hn
+                    return output, hn
+            rnn = InitialHidden(hidden_size, self.config.begin == 'zero_st')
+        else:
+            raise AttributeError()
+
+        # net_type = self.net_type
+        #
         # if net_type == 'rnn':
         # elif net_type == 'lstm':
         #     rnn = LSTM(input_size=input_size, num_layers=num_layers, hidden_size=hidden_size)
@@ -73,6 +114,9 @@ class DiffNet(Module):
         estimate_y_all = torch.stack(estimate_y_list, dim=0)
 
         return estimate_y_all
+
+
+
 
     def recursive_predict(self, hn_seq, max_len=50):
 

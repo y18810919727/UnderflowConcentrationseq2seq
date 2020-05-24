@@ -35,7 +35,7 @@ class Particle:
 
 
 class PSO:
-    def __init__(self, dim, size, iter_num, x_max, max_vel, evn, best_fitness_value=float('Inf'), C1=2, C2=2, W=1, error_limit=1e-3):
+    def __init__(self, dim, size, iter_num, x_max, max_vel, evn, best_fitness_value=float('Inf'), C1=2, C2=2, W=1, error_limit=5e-3):
         self.C1 = C1
         self.C2 = C2
         self.W = W

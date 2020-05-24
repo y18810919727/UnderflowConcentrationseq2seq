@@ -9,24 +9,24 @@ import torch
 from models.diff import DiffNet
 from models.ode import ODENet
 from custom_dataset import Target_Col, Control_Col
-from config import args as config
 from models.asrnn import ASRNN
 
 from torch import nn
 
 class HiddenRNN(DiffNet):
-    def __init__(self, input_size, num_layers, hidden_size, out_size, net_type='lstm', epsilon=0.1):
+    def __init__(self, input_size, num_layers, hidden_size, out_size, config, net_type='lstm', epsilon=0.1):
 
-        super(HiddenRNN, self).__init__(input_size, num_layers, hidden_size, out_size, net_type)
+        super(HiddenRNN, self).__init__(input_size, num_layers, hidden_size, out_size, config, net_type)
+        self.net_type = net_type
 
-        self.epsilon = 0.1
-        if config.net_type == 'rnn':
+        self.epsilon = epsilon
+        if self.net_type == 'rnn':
             Model_Class = nn.RNN
-        elif config.net_type == 'lstm':
+        elif self.net_type == 'lstm':
             Model_Class = nn.LSTM
-        elif config.net_type == 'GRU':
+        elif self.net_type == 'GRU':
             Model_Class = nn.GRU
-        elif config.net_type == 'asrnn':
+        elif self.net_type == 'asrnn':
             Model_Class =ASRNN
         else:
             raise AttributeError("Please give a type of rnn net. lstm or rnn or GRU or asrnn")
@@ -43,7 +43,7 @@ class HiddenRNN(DiffNet):
         """
         pre_x, pre_y, forward_x = input
         output, hn = self.rnn(torch.cat([pre_x, pre_y], dim=2))
-        if config.net_type =='lstm':
+        if self.net_type =='lstm':
             hn = (hn, torch.zeros_like(hn))
 
 
@@ -56,14 +56,14 @@ class HiddenRNN(DiffNet):
             _, hn_inc = self.hidden_rnn(torch.unsqueeze(
                 forward_x[i], dim=0
             ), hn)
-            if config.net_type == 'rnn' or config.net_type == 'GRU' or config.net_type == 'asrnn':
-                if config.no_hidden_diff:
+            if self.net_type == 'rnn' or self.net_type == 'GRU' or self.net_type == 'asrnn':
+                if self.config.no_hidden_diff:
                     hn = hn_inc
                 else:
                     hn = hn + self.epsilon * hn_inc
                 output = hn
             else:
-                if config.no_hidden_diff:
+                if self.config.no_hidden_diff:
                     hn = hn_inc
                 else:
                     hn = (hn[0] + self.epsilon * hn_inc[0], hn_inc[1])

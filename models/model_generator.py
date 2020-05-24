@@ -27,5 +27,6 @@ def initialize_model(config):
         raise AttributeError
 
     net = SeriesNet(input_size=len(Target_Col+Control_Col),
-                    num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(Target_Col), net_type=config.net_type)
+                    num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(Target_Col),
+                    config=config, net_type=config.net_type)
     return net

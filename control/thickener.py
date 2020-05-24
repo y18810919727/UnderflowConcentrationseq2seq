@@ -7,7 +7,6 @@ import json
 
 import torch
 from torch.autograd import Variable
-from config import args as config
 import pandas
 from control.scaler import MyScaler
 from custom_dataset import Target_Col
@@ -15,6 +14,7 @@ from custom_dataset import Control_Col
 from torchdiffeq import odeint
 from common import col2Index
 from decimal import Decimal
+from config import args
 
 class Thickener():
 
@@ -24,7 +24,8 @@ class Thickener():
                  random_seed=None,
                  T= 1,
                  m=3,
-                 batch_size=1
+                 batch_size=1,
+                 config=None
                  ):
 
         """
@@ -38,6 +39,9 @@ class Thickener():
         """
 
         self.random_seed = random_seed
+        if config is None:
+            from config import args as config
+        self.config = config
 
         # Time step
         self.T = T
@@ -52,7 +56,7 @@ class Thickener():
         self.scaler = scaler
 
         self.last_u = torch.FloatTensor([0, 0, 0])
-        self.y_target = self.scaler.scale_target(torch.FloatTensor(config.y_target))
+        self.y_target = self.scaler.scale_target(torch.FloatTensor(args.y_target))
         self.Q = torch.diag(torch.FloatTensor([10.0, 0.01]))
         self.R = torch.diag(torch.FloatTensor([0.001, 0.001, 0.001]))
 
@@ -80,8 +84,9 @@ class Thickener():
         # x: (batch_size, hidden_num),
         # begin_index: (batch_size), 记录位置用于后续生成外部噪音c
         self.x, self.begin_index = self.initial_hidden_state(self.random_seed, self.scaled_data)
+        self.hidden_num = self.x.shape[1]
 
-        self.begin_index = [9680]
+        # self.begin_index = [9680]
 
         print('begin_index:' + str(self.begin_index))
 
@@ -90,7 +95,7 @@ class Thickener():
             dim=1
         )
 
-        if config.constant_noise > 0:
+        if args.constant_noise > 0:
             self.c_u_seq[:, :, self.uncontrollable_in_input_index] = torch.FloatTensor([0,0])
 
         self.c = self.c_u_seq[0][:, self.uncontrollable_in_input_index]
@@ -108,7 +113,7 @@ class Thickener():
 
     def update_c_u_seq(self, u):
         # 寻找当前生成c的下标
-        self.input_position = int(self.t / config.t_step)
+        self.input_position = int(self.t / self.config.t_step)
         # 更新指定下标位置及相邻写一个位置的外部输入量u
         self.c_u_seq[self.input_position, :, self.controllable_in_input_index] = u
         self.c = self.c_u_seq[self.input_position][:, self.uncontrollable_in_input_index]
@@ -129,10 +134,6 @@ class Thickener():
         if forward:
             self.last_u = u
 
-        if config.action_constraint > 0:
-            # 把u映射到(-1,1)
-            u = torch.atan(u) * 2 / self.pi
-
         assert self.batch_size == u.shape[0]
 
         self.update_c_u_seq(u)
@@ -140,7 +141,7 @@ class Thickener():
         # 计算f_u_grad
         ode_input = Variable(torch.cat((self.x, self.c_u_seq[self.input_position]), dim=1), requires_grad=True)
         ode_ouput = self.ode_net.grad_module(ode_input)
-        if config.x_decode > 0:
+        if args.x_decode > 0:
             ode_ouput = self.fcn(ode_ouput)
         jacT = torch.zeros(ode_input.shape[1], ode_ouput.shape[1])
         for i in range(ode_ouput.shape[1]):
@@ -148,11 +149,10 @@ class Thickener():
             gradients[:, i] = 1
             j = torch.autograd.grad(ode_ouput, ode_input, grad_outputs=gradients, retain_graph=True)
             jacT[:, i:i + 1] = j[0].T
-        f_u_index = [i+16 for i in self.controllable_in_input_index]
+        f_u_index = [i+self.hidden_num for i in self.controllable_in_input_index]
         f_u_grad = jacT[f_u_index, :]
 
         # 更新ode求解模型中的控制输入序列
-        self.ode_net.set_u(self.c_u_seq)
 
         def linear_fit(a, b, x):
             assert 0 <= x <= 1
@@ -162,7 +162,7 @@ class Thickener():
         cur_c_u = linear_fit(
             self.c_u_seq[self.input_position],
             self.c_u_seq[min(self.input_position+1, len(self.c_u_seq) - 1)],
-            (self.t - config.t_step * self.input_position) / config.t_step
+            (self.t - self.config.t_step * self.input_position) / self.config.t_step
         )
         t = torch.FloatTensor([self.t, self.t+self.T])
 
@@ -172,7 +172,8 @@ class Thickener():
             # 计算导数
             dx_dt = self.ode_net.grad_module(torch.cat([self.x, cur_c_u], dim=1))
             # 计算t+T时刻的系统状态1
-            x = odeint(self.ode_net, self.x, t, rtol=config.rtol, atol=config.atol)[1]
+            from common import discrete_odeint
+            x = discrete_odeint(self.ode_net, self.c_u_seq, self.x, t, rtol=self.config.rtol, atol=self.config.atol)[1]
 
         if forward:
             self.t = Decimal(str(self.t)) + Decimal(str(self.T))
@@ -180,7 +181,7 @@ class Thickener():
             # self.last_u = u
             self.x = x
 
-        if config.x_decode > 0:
+        if args.x_decode > 0:
             x_decode = self.fcn(x).data
             dx_dt = self.fcn(dx_dt).data
             return x_decode, dx_dt
@@ -193,14 +194,15 @@ class Thickener():
 
         np.random.seed(random_seed)
         # 定义batch_size 个随机起点
-        begin_index = np.random.randint(0, self.length - config.look_back + 1 - config.min_future_length, self.batch_size)
+        begin_index = np.random.randint(0, self.length - self.config.look_back + 1 - self.config.min_future_length, self.batch_size)
         # begin_index = np.random.randint(0, 10, self.batch_size)
 
         # 拿出历史数据，准备使用rnn编码
-        y = [torch.FloatTensor(scaled_data[ind:ind+config.look_back, self.target_index]) for ind in begin_index]
-        u = [torch.FloatTensor(scaled_data[ind:ind+config.look_back, self.input_index]) for ind in begin_index]
-        y = torch.stack(y, dim=1)
-        u = torch.stack(u, dim=1)
+
+        y = [torch.FloatTensor(scaled_data[ind:ind+self.config.look_back, self.target_index]) for ind in begin_index]
+        u = [torch.FloatTensor(scaled_data[ind:ind+self.config.look_back, self.input_index]) for ind in begin_index]
+        y = torch.stack(y,dim=1)
+        u = torch.stack(u,dim=1)
 
         historical_series = torch.cat([u, y],dim=2)
 
@@ -213,7 +215,7 @@ class Thickener():
 
         # The shape of hn is (num_layers, batch_size, hidden_num ). Here, it assumes num_layers is equal to 1.
 
-        return hn[0], begin_index+config.look_back-1
+        return hn[0], begin_index+self.config.look_back-1
 
 
 
