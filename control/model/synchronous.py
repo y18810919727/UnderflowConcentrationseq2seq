@@ -26,7 +26,7 @@ class SynchronousController:
                  actor_err_limit=1e-4,
                  critic_err_limit=0.01,
                  actor_lr=1,
-                 critic_lr=1,
+                 critic_lr=0.5,
                  dim_x_c=16,
                  step_max=200000
                  ):
@@ -49,15 +49,19 @@ class SynchronousController:
 
         # self.W_size = int(self.dim_x_c * (self.dim_x_c+1) / 2)
         self.W_size = self.dim_x_c ** 2
-        self.W_1 = torch.ones(self.W_size, 1) / 2
-        self.W_2 = torch.ones(self.W_size, 1) / 2
+        self.W_1 = torch.ones(self.W_size, 1) / 1000
+        self.W_2 = torch.ones(self.W_size, 1) /1000
 
         f_value = self.W_size * [1]
 
         self.F_1 = torch.unsqueeze(torch.FloatTensor(f_value), dim=1)
         self.F_2 = torch.diag(torch.FloatTensor(f_value))
 
-        parameter_name = 'y_target=' + str(config.y_target)
+        if config.constant_noise == 0:
+            parameter_name = 'y_target=' + str(config.y_target) + '__noise'
+        else:
+            parameter_name = 'y_target=' + str(config.y_target)
+
         if config.is_write > 0:
             self.writer = SummaryWriter(os.path.join('logs', 'ode_control', str(
                 time.strftime("%Y%m%d%H%M%S", time.localtime())) + '__' + parameter_name))
@@ -105,6 +109,9 @@ class SynchronousController:
 
         h_u = u + f_u_grad @ self.quadratic_cost.R.inverse() / 2
 
+        # print('u:' + str(u.data.numpy().tolist()))
+        # print('h_u:' + str(h_u.data.numpy().tolist()))
+
         h_u_grad = torch.zeros(h_u.shape[1], u.shape[1])
         for i in range(h_u.shape[1]):
             gradients = torch.zeros(1, h_u.shape[1])
@@ -115,24 +122,22 @@ class SynchronousController:
                 j = torch.autograd.grad(h_u[:, i], u, retain_graph=True)
             h_u_grad[:, i:i + 1] = j[0].T
 
+        # print('h_u_grad:' + str(h_u_grad.data.numpy().tolist()))
+
         return h_u.data @ h_u_grad.inverse().data
 
     def solve_u(self, w, last_u):
         u = last_u
         i = 0
         c = self.evn.c
-        lr = 1
         while True:
             i += 1
-            if lr % 10 == 0:
-                lr = lr * 0.8
             adjust_value = self.dh_du_func(u, w, c)
-            new_u = u - adjust_value.data * lr
-            if torch.dist(new_u, u) < self.actor_err_limit:
+            new_u = u - adjust_value.data
+            u_dist = torch.dist(new_u, u)
+            print('u_dist:' + str(u_dist.data.numpy().tolist()))
+            if u_dist < self.actor_err_limit:
                 break
-            last_dist = torch.dist(new_u, u)
-            # if i == 10:
-            print('u_dist:' + str(last_dist.data.numpy().tolist()))
             u = new_u.data
         return new_u
 
@@ -144,14 +149,15 @@ class SynchronousController:
 
         for step in range(self.step_max):
             print('STEP-'+str(step))
-            x, x_grad, f_u_grad = self.evn.f(u)
+            x, x_grad, f_u_grad = self.evn.f(u, forward=True)
 
             utility = self.quadratic_cost.get_cost(self.evn.last_x, u)
             # phi, phi_x_grad = self.phi(torch.cat((x, self.evn.c), dim=1))
             phi, phi_x_grad = self.phi(x)
             critic_value = self.W_1.T @ phi
 
-
+            # if step % 1000 == 0 or step < 100:
+            self.quadratic_cost.last_u = u
             u = self.solve_u(last_u=u, w=phi_x_grad.data @ self.W_2.data)
             # u = (- self.quadratic_cost.R.inverse() @ f_u_grad @ phi_x_grad @ self.W_2 / 2).T
 
@@ -189,4 +195,4 @@ class SynchronousController:
             self.F_2 = (D1 @ self.W_1 @ m.T + m @ self.W_1.T @ D1) / 8 + torch.diag(torch.FloatTensor(self.W_size * [1]))
 
             print('utility:' + str(utility.data.numpy().tolist()) + '; critic_value:' + str(
-                critic_value.data.numpy().tolist()) + '\n u:' + str(u_unscale.data.numpy().tolist()))
+                critic_value.data.numpy().tolist()) + '\n u:' + str(u.data.numpy().tolist()))

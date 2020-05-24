@@ -22,7 +22,7 @@ class Thickener():
                  model,
                  scaler: MyScaler,
                  random_seed=None,
-                 T= 0.10,
+                 T= 1,
                  m=3,
                  batch_size=1
                  ):
@@ -42,6 +42,7 @@ class Thickener():
         # Time step
         self.T = T
         self.t = 0
+        self.pi = 3.14159265359
         self.batch_size = batch_size
 
         self.rnn = model.rnn
@@ -49,6 +50,11 @@ class Thickener():
         self.m = m
         self.fcn = model.fc
         self.scaler = scaler
+
+        self.last_u = torch.FloatTensor([0, 0, 0])
+        self.y_target = self.scaler.scale_target(torch.FloatTensor(config.y_target))
+        self.Q = torch.diag(torch.FloatTensor([10.0, 0.01]))
+        self.R = torch.diag(torch.FloatTensor([0.001, 0.001, 0.001]))
 
         ori_data = np.array(pandas.read_csv(config.DATA_PATH))
 
@@ -75,6 +81,8 @@ class Thickener():
         # begin_index: (batch_size), 记录位置用于后续生成外部噪音c
         self.x, self.begin_index = self.initial_hidden_state(self.random_seed, self.scaled_data)
 
+        self.begin_index = [9680]
+
         print('begin_index:' + str(self.begin_index))
 
         self.c_u_seq = torch.stack(
@@ -83,9 +91,19 @@ class Thickener():
         )
 
         if config.constant_noise > 0:
-            self.c_u_seq[:, :, self.uncontrollable_in_input_index] = self.c_u_seq[0, 0, self.uncontrollable_in_input_index]
+            self.c_u_seq[:, :, self.uncontrollable_in_input_index] = torch.FloatTensor([0,0])
 
         self.c = self.c_u_seq[0][:, self.uncontrollable_in_input_index]
+
+    def fit_fun(self, du):
+        du = torch.unsqueeze(du, dim=0)
+        u = self.last_u + du
+        y, dx_dt = self.f(u)
+        y_det = y - self.y_target
+        y_cost = torch.sum(y_det @ self.Q @ y_det.T, dim=1)
+        u_cost = torch.sum(du @ self.R @ du.T, dim=1)
+        cost = (y_cost + u_cost).data.numpy()[0]
+        return cost
 
 
     def update_c_u_seq(self, u):
@@ -98,7 +116,8 @@ class Thickener():
         if self.input_position + 1 < len(self.c_u_seq):
             self.c_u_seq[self.input_position + 1, :, self.controllable_in_input_index] = u
 
-    def f(self, u):
+
+    def f(self, u, forward=False):
         """
         根据自己生产的扰动量c以及输入控制量u，更新状态x并给出x的导数
         :param u: (bs, m) or (m,)
@@ -106,6 +125,13 @@ class Thickener():
         """
         if u.shape is (self.m,):
             u = u.unsqueeze(dim=0)
+
+        if forward:
+            self.last_u = u
+
+        if config.action_constraint > 0:
+            # 把u映射到(-1,1)
+            u = torch.atan(u) * 2 / self.pi
 
         assert self.batch_size == u.shape[0]
 
@@ -146,17 +172,20 @@ class Thickener():
             # 计算导数
             dx_dt = self.ode_net.grad_module(torch.cat([self.x, cur_c_u], dim=1))
             # 计算t+T时刻的系统状态1
-            self.x = odeint(self.ode_net, self.x, t, rtol=config.rtol, atol=config.atol)[1]
+            x = odeint(self.ode_net, self.x, t, rtol=config.rtol, atol=config.atol)[1]
 
-        self.t = Decimal(str(self.t)) + Decimal(str(self.T))
-        self.t = float(str(self.t))
+        if forward:
+            self.t = Decimal(str(self.t)) + Decimal(str(self.T))
+            self.t = float(str(self.t))
+            # self.last_u = u
+            self.x = x
 
         if config.x_decode > 0:
-            self.x_decode = self.fcn(self.x).data
+            x_decode = self.fcn(x).data
             dx_dt = self.fcn(dx_dt).data
-            return self.x_decode, dx_dt, f_u_grad
+            return x_decode, dx_dt
 
-        return self.x, dx_dt, f_u_grad
+        return x, dx_dt
 
 
     def initial_hidden_state(self, random_seed, scaled_data):

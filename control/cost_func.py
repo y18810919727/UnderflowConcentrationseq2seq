@@ -49,7 +49,7 @@ class QuadraticCost(CostFuncBase):
             # 这些参数我目前是随机定的，可以根据实验结果微调
             config = {
                 'Q': torch.diag(torch.FloatTensor([10.0, 0.001])),
-                'R': torch.diag(torch.FloatTensor([0.001, 0.001, 0.001])),
+                'R': torch.diag(torch.FloatTensor([0.01, 0.01, 0.01])),
                 'u_mid': torch.FloatTensor([0, 0, 0]),
                 'n': 2,
                 'm': 3,
@@ -68,6 +68,7 @@ class QuadraticCost(CostFuncBase):
 
         y_det = y-self.y_target
         u_det = u-self.u_mid
+        # u_det = u - self.last_u
         y_cost = torch.sum(y_det @ self.Q @ y_det.T, dim=1)
         u_cost = torch.sum(u_det.matmul(self.R).matmul(u_det.T), dim=1)
         print('y_cost:'+str(y_cost.data[0])+'; u_cost:'+str(u_cost.data[0]))

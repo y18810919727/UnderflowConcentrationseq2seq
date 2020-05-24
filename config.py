@@ -49,12 +49,13 @@ parser.add_argument('--controllable', type=list, default=['5','7','15'])
 parser.add_argument('--uncontrollable', type=list, default=['4', '16'])
 parser.add_argument('--con_batch_size', type=int, default=1)
 parser.add_argument('--all_col', type=list, default=['1','4','5','7','11','15','16','17','18','19','20','21','22'])
-parser.add_argument('--y_target', type=list, default=[50, 20])
-parser.add_argument('--constant_noise', type=int, default=0)
+parser.add_argument('--y_target', type=list, default=[63, 32])
+parser.add_argument('--constant_noise', type=int, default=1)
 parser.add_argument('--is_write', type=int, default=1)
-parser.add_argument('--x_decode', type=int, default=0)
-parser.add_argument('--phi_input',type=int, default=1)
-
+parser.add_argument('--x_decode', type=int, default=1)
+parser.add_argument('--phi_input', type=int, default=1)
+parser.add_argument('--mpc_control', type=int, default=1)
+parser.add_argument('--action_constraint', type=int, default=0)
 
 args = parser.parse_args()
 
