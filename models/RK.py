@@ -10,13 +10,12 @@ import torch
 from models.ode import ODENet
 
 from models.ode import MyODE
-from config import args as config
 
 
 
 class RK(MyODE):
-    def __init__(self, input_size, num_layers, hidden_size, out_size, net_type='rnn'):
-        super(RK, self).__init__(input_size, num_layers, hidden_size, out_size, net_type)
+    def __init__(self, input_size, num_layers, hidden_size, out_size, config, net_type='rnn'):
+        super(RK, self).__init__(input_size, num_layers, hidden_size, out_size, config, net_type)
         self.grad_module = self.ode_net.grad_module
         self.ode_net = None
 
@@ -30,11 +29,11 @@ class RK(MyODE):
         """
         pre_x, pre_y, forward_x = input
         output, hn = self.rnn(torch.cat([pre_x, pre_y], dim=2))
-        if config.net_type == 'lstm':
+        if self.config.net_type == 'lstm':
             hn = hn[0]
 
-        t = torch.linspace(0, config.t_step * forward_x.shape[0], forward_x.shape[0]+1)
-        if config.use_cuda:
+        t = torch.linspace(0, self.config.t_step * forward_x.shape[0], forward_x.shape[0]+1)
+        if self.config.use_cuda:
             t = t.cuda()
 
 
@@ -49,7 +48,7 @@ class RK(MyODE):
             mid_u = (u_seq[i] + u_seq[i+1])/2
             dt = t[i+1]-t[i]
 
-            hn = hn + self.cal_RK_parameters(u_seq[i], u_seq[i+1], hn, dt, int(config.algorithm[-1]))
+            hn = hn + self.cal_RK_parameters(u_seq[i], u_seq[i+1], hn, dt, int(self.config.algorithm[-1]))
             hn_all_list.append(hn)
 
         hn_all = torch.stack(hn_all_list, dim=0)

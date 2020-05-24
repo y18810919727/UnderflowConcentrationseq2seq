@@ -90,7 +90,6 @@ class QuadraticCost(CostFuncBase):
 
 
 
-#Todo
 #class IntegralCost(CostFuncBase):
 
 

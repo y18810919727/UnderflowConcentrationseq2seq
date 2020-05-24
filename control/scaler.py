@@ -6,18 +6,12 @@ import os
 import json
 
 import torch
-from config import args as config
 from common import col2Index
 from custom_dataset import Target_Col
 from custom_dataset import Control_Col
 
 class MyScaler:
-    def __init__(self, scaler_mean, scaler_var, target_col, control_col, controllable=None, uncontrollable=None):
-        if controllable is None:
-            controllable = config.controllable
-        if uncontrollable is None:
-            uncontrollable = config.uncontrollable
-
+    def __init__(self, scaler_mean, scaler_var, All_col, target_col, control_col, controllable=None, uncontrollable=None):
         scaler_var = np.sqrt(scaler_var)
 
         self.controllable = controllable
@@ -27,10 +21,10 @@ class MyScaler:
         self.scaler_var = scaler_var
         self.target_col = target_col
         self.control_col = control_col
-        self.target_mean = torch.FloatTensor(scaler_mean[col2Index(config.all_col, target_col)])
-        self.target_var = torch.FloatTensor(scaler_var[col2Index(config.all_col, target_col)])
-        self.control_mean = torch.FloatTensor(scaler_mean[col2Index(config.all_col, control_col)])
-        self.control_var = torch.FloatTensor(scaler_var[col2Index(config.all_col, control_col)])
+        self.target_mean = torch.FloatTensor(scaler_mean[col2Index(All_col, target_col)])
+        self.target_var = torch.FloatTensor(scaler_var[col2Index(All_col, target_col)])
+        self.control_mean = torch.FloatTensor(scaler_mean[col2Index(All_col, control_col)])
+        self.control_var = torch.FloatTensor(scaler_var[col2Index(All_col, control_col)])
 
         self.controllable_mean = self.control_mean[col2Index(control_col, self.controllable)]
         self.uncontrollable_mean = self.control_mean[col2Index(control_col, self.uncontrollable)]

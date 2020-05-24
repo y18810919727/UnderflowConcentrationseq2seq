@@ -22,8 +22,9 @@ parser.add_argument('--net_type', type=str, default='rnn')
 parser.add_argument('--algorithm', type=str, default='ode')
 parser.add_argument('--hidden_num', type=int, default=16)
 parser.add_argument('--num_layers', type=int, default=1)
-parser.add_argument('--look_back', type=int, default=120)
+parser.add_argument('--look_back', type=int, default=160)
 parser.add_argument('--look_forward', type=int, default=60)
+parser.add_argument('--test_look_forward', type=int, default=60)
 parser.add_argument('--sample_dis', type=int, default=10)
 parser.add_argument('--epochs', type=int, default=40)
 parser.add_argument('--save_dir', type=str, default='_basic')
@@ -34,12 +35,20 @@ parser.add_argument('--test_model', type=str, default='0')
 parser.add_argument('--is_train', type=str, default=False)
 parser.add_argument('--test_all', action='store_true', default=False)
 parser.add_argument('--random_seed', type=int, default=None)
+parser.add_argument('--nou', action='store_true', default=False)
 parser.add_argument('--t_step', type=float, default=10.0/60)
+parser.add_argument('--encode_rnn', type=str, default='rnn', help='rnn or lstm or GRU')
 
 parser.add_argument('--rtol', type=str, default='1')
 parser.add_argument('--atol', type=str, default='2')
+parser.add_argument('--interpolation', type=str, default="quadratic", help="slinear, quadratic, cubic")
+parser.add_argument('--begin', type=str, default="GRU_st", help="rnn_st, zero_st, learn_st")
+parser.add_argument('--ode_method', type=str, default="dopri5", help="methods for computing ode")
 
-parser.add_argument('--DATA_PATH', type=str, default='./data/res_all_selected_features_0.csv')
+
+parser.add_argument('--DATA_PATH', type=str, default='./data/res_all_selected_features_half.csv')
+parser.add_argument('--data_half', action='store_true', default=False, help='double data separation')
+parser.add_argument('--test_re', type=str, default='*')
 
 parser.add_argument('--con_algorithm', type=str, default='synchronous')
 parser.add_argument('--no_hidden_diff', action='store_true', default=False)
@@ -57,6 +66,8 @@ args = parser.parse_args()
 if args.epochs == 0:
     args.epochs = 1e8
 
+if args.data_half:
+    args.DATA_PATH = './data/res_all_selected_features_half.csv'
 
 use_cuda = args.use_cuda if torch.cuda.is_available() else False
 args.use_cuda = use_cuda
@@ -75,6 +86,10 @@ for arg in vars(args):
         vars(args)[arg] = False
 
 args.save_dir = args.net_type + args.save_dir
+if args.nou:
+    args.save_dir = args.save_dir + '_nou'
+if args.algorithm == 'ode':
+    args.save_dir = args.save_dir + '_' + args.ode_method
 if args.is_train and args.test_all:
     raise AttributeError('Can not test all in training phase.')
 
@@ -83,15 +98,21 @@ import time
 
 if not os.path.exists('logs'):
     os.makedirs('logs')
-args.writer = MyWriter(
-    save_path=os.path.join('logs', args.save_dir, str(time.strftime("%Y%m%d%H%M%S", time.localtime()))),
-    is_write=args.tb
 
-)
+if args.test_model == '0':
+    args.tb_path = os.path.join('logs', args.save_dir, str(time.strftime("%Y%m%d%H%M%S", time.localtime())))
+else:
+    args.tb_path = os.path.join('expresults/logs', args.save_dir)
+
+
 
 
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
 data = pd.read_csv(args.DATA_PATH)
 args.scaler = StandardScaler().fit(data)
+
+from control.scaler import MyScaler
+from custom_dataset import Target_Col, Control_Col
+args.my_scaler = MyScaler(args.scaler.mean_, args.scaler.var_, args.all_col, Target_Col, Control_Col, args.controllable, args.uncontrollable)
 

@@ -35,24 +35,36 @@ def cal_jac():
 
 # 载入pth
 
-cal_jac()
+#cal_jac()
 
-state_dic = torch.load('./ckpt/lstm_ode_4_5/95.pth')
 
-from models.ode import MyODE
+# 注意1：这里提供了三个模型，一个affine的，两个普通的，旧的模型不能用了
+#state_dic = torch.load('./ckpt/rnn_ode_3_4_h32_cubic_transform_dopri5/best.pth')
+#state_dic = torch.load('./ckpt/GRU_ode_3_4_h32_cubic_dopri5/best.pth')
+state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_transform/best.pth')
 
-# 与预测建模的实验公用config
-net = MyODE(input_size=len(Target_Col+Control_Col),
-            num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(Target_Col), net_type=config.net_type)
 
+from models.model_generator import initialize_model
+
+# 保存的pth文件中直接记录着当时训练模型时的config字典
+model_config = state_dic['config']
+
+net = initialize_model(config=model_config)
+
+# net = MyODE(input_size=len(Target_Col+Control_Col),
+#             num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(Target_Col), net_type=config.net_type)
 net.load_state_dict(state_dic['net'])
+net.ode_net.interpolation_kind = 'slinear'
 
 # 自定义数据归一化工具
 _mean, _var = state_dic['scaler_mean'], state_dic['scaler_var']
-my_scaler = MyScaler(_mean, _var, Target_Col, Control_Col, config.controllable, config.uncontrollable)
+
+# 注意2: MyScaler构造函数增加了一参数all_col
+my_scaler = MyScaler(_mean, _var, model_config.all_col,  Target_Col, Control_Col, config.controllable, config.uncontrollable)
 
 
-thickener = Thickener(net, my_scaler, None)
+# 注意3: Thickener 的构造函数中需要添加config参数
+thickener = Thickener(net, my_scaler, None, config=model_config)
 
 # 随机生成控制量进行测试
 u = torch.rand(1, 3)
@@ -60,7 +72,8 @@ nx, x_grad, f_u_grad = thickener.f(u)
 print(nx)
 
 # 定义效用计算器，计算效用值
-quadratic_cost = QuadraticCost(net.fc)
+quadratic_cost = QuadraticCost(fcn=net.fc)
+quadratic_cost.y_target = my_scaler.scale_target(torch.FloatTensor(config.y_target))
 utility = quadratic_cost.get_cost(nx, u)
 print(utility)
 

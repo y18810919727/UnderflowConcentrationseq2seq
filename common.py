@@ -113,6 +113,24 @@ def parser_dir(dir_name, config):
     net_type = dir_name[:dir_name.find('_')]
     config.net_type = net_type
 
+    if 'learn_st' in dir_name:
+        config.begin = 'learn_st'
+    elif 'zero_st' in dir_name:
+        config.begin = 'zero_st'
+    elif 'rnn_st' in dir_name:
+        config.begin = 'rnn_st'
+    else:
+        config.begin = 'rnn_st'
+
+
+    if '_nou' in dir_name:
+        config.nou = True
+    else:
+        config.nou = False
+
+    if 'half' in dir_name:
+        config.DATA_PATH = './data/res_all_selected_features_half.csv'
+
     dis = re.findall('_dis(\d*)', dir_name)
     if len(dis)>0:
         config.sample_dis = int(dis[0])
@@ -126,6 +144,10 @@ def parser_dir(dir_name, config):
             config.algorithm = 'ode_affine'
         else:
             config.algorithm = 'ode'
+
+        for interpolation in ['quadratic', 'slinear', 'cubic', 'ori', 'linear']:
+            config.interpolation = interpolation
+            break
 
         tols = re.findall('_(\d)_(\d)', dir_name)
         config.rtol = float('1e-' + tols[0][0])
@@ -145,6 +167,22 @@ def parser_dir(dir_name, config):
         return False
 
     return True
+
+
+def discrete_odeint(ode_net, c_u_seq, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None):
+
+
+    from torchdiffeq import odeint
+
+    ode_net.fit_c_u_seq(c_u_seq, t)
+    res = odeint(ode_net, y0, t, rtol=rtol, atol=atol, method=method, options=options)
+
+    ode_net.fit_fcn_list = None
+    return res
+
+
+
+
 
 if __name__ == '__main__':
 

@@ -18,6 +18,7 @@ Control_Col = ['4','5','7','15','16']
 class MyDataset(Dataset):
     def __init__(self,
                  data,
+                 config,
                  look_back=120,
                  look_forward=60,
                  sample_dis=-1,
@@ -35,6 +36,7 @@ class MyDataset(Dataset):
             look_forward = self.data_length - look_back
             sample_dis = self.data_length
 
+        self.config = config
         self.sample_dis = sample_dis
         self.look_forward = look_forward
         self.look_back = look_back
@@ -75,6 +77,10 @@ class MyDataset(Dataset):
             forward_x,
             forward_y,
         ]]
+
+        # Autoregression vs System Identification
+        if self.config.nou:
+            tmp[2] = tmp[2] * 0
         return tuple(tmp)
 
 
@@ -94,16 +100,15 @@ def initialize_dataset(config):
     scaled_data_validate = scaled_data[train_size:validate_size+train_size]
     scaled_data_test = scaled_data[-test_size:]
 
-    train_dataset = MyDataset(pd.DataFrame(scaled_data_train, columns=data.columns),
+    train_dataset = MyDataset(pd.DataFrame(scaled_data_train, columns=data.columns), config,
                               look_back=config.look_back, look_forward=config.look_forward,
                               sample_dis=config.sample_dis)
 
-    validate_dataset = MyDataset(pd.DataFrame(scaled_data_validate, columns=data.columns),
+    validate_dataset = MyDataset(pd.DataFrame(scaled_data_validate, columns=data.columns), config,
                                  look_back=config.look_back, look_forward=config.look_forward)
 
-    test_dataset = MyDataset(pd.DataFrame(scaled_data_test, columns=data.columns),
-                             look_back=config.look_back, look_forward=config.look_forward)
-
+    test_dataset = MyDataset(pd.DataFrame(scaled_data_test, columns=data.columns), config,
+                             look_back=config.look_back, look_forward=config.test_look_forward)
 
     train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
     val_loader = DataLoader(validate_dataset, batch_size=config.batch_size, shuffle=False)

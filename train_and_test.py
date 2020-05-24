@@ -15,7 +15,7 @@ from tensorboardX import SummaryWriter
 from common import RRSE
 
 
-def test_net(net, test_loader, config, critic_func=None, epoch=0, plt_visualize=False, tb_visualize=False):
+def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_visualize=False, tb_visualize=False):
 
     if critic_func is None:
         critic_func = torch.nn.MSELoss()
@@ -24,7 +24,7 @@ def test_net(net, test_loader, config, critic_func=None, epoch=0, plt_visualize=
     if type(critic_func) is dict and len(critic_func) >=2:
         metrics = {}
         for key, func in critic_func.items():
-            metric, total_test_items, acc_time = test_net(net, test_loader, config, func, epoch, plt_visualize, tb_visualize)
+            metric, total_test_items, acc_time = test_net(net, test_loader, config, writer, func, epoch, plt_visualize, tb_visualize)
             metrics[key] = metric
         return metrics, total_test_items, acc_time
 
@@ -58,20 +58,31 @@ def test_net(net, test_loader, config, critic_func=None, epoch=0, plt_visualize=
         total_test_loss += float(test_loss) * pre_x.shape[1]
         total_test_items += pre_x.shape[1]
 
-        y_est_series = y_estimate_all.detach().cpu().numpy()
-        y_series = forward_y.detach().cpu().numpy()
-        pre_y_cpu = pre_y.detach().cpu().numpy()
+        y_est_series = y_estimate_all.detach().cpu()
+        y_series = forward_y.detach().cpu()
+        pre_y_cpu = pre_y.detach().cpu()
+
+        # unscale series by self defined scaler
+        pre_y_cpu = config.my_scaler.unscale_target(pre_y_cpu).cpu()
+        y_series = config.my_scaler.unscale_target(y_series).cpu()
+        y_est_series = config.my_scaler.unscale_target(y_est_series).cpu()
 
         from custom_dataset import Target_Col
         if len(Target_Col) == 3:
             name = ['height', 'UC', 'Pressure']
+            unit_name = ['m', '%', 'Mpa']
         else:
             name = ['UC', 'Pressure']
+            unit_name = ['%', 'Mpa']
         if tb_visualize:
             for y_index in range(len(Target_Col)):
                 for series_index in range(min(config.batch_size, pre_x.shape[1])):
 
-                    fig = plt.figure(figsize=(5, 3))
+                    # ODE method performs best in group : (1-0)
+                    if i!=1 or series_index != 0:
+                        continue
+
+                    fig = plt.figure(figsize=(5, 4))
                     #plt.ylim(-3,3)
 
                     plt.plot(np.arange(0, config.look_back, 1), pre_y_cpu[:, series_index, y_index])
@@ -80,14 +91,20 @@ def test_net(net, test_loader, config, critic_func=None, epoch=0, plt_visualize=
                              y_series[:, series_index, y_index])
                     plt.plot(np.arange(config.look_back, right_end,1),
                              y_est_series[:, series_index, y_index])
-                    plt.legend(['Pre', 'Real', 'forecast'])
-                    plt.title('{}-{}-{}'.format(name[y_index],i,series_index))
+                    plt.legend(['History', 'True', 'Prediction'])
+                    plt.grid()
+                    if config.is_train == '0':
+                        plt.title('{}-{}-{}'.format(name[y_index],i,series_index))
+                    else:
+                        plt.ylabel(name[y_index]+'({})'.format(unit_name[y_index]))
+                        plt.xlabel('Time(min)')
                     # writer.add_pr_curve(tag=os.path.join(name[y_index], str(series_index)),
                     #                     predictions=y_est_series[:, series_index, y_index],
                     #                     labels=y_series[:, series_index, y_index],
                     #                     global_step=epoch,
                     #                     )
-                    config.writer.add_figure(os.path.join(name[y_index], str(i), str(series_index)), fig, global_step=epoch)
+                    #plt.savefig('expresults/figs/'+ name[y_index] + '_' +config.save_dir+'.eps', dpi=600)
+                    writer.add_figure(os.path.join(name[y_index], str(i), str(series_index)), fig, global_step=epoch)
                     fig.clf()
 
 
@@ -128,7 +145,13 @@ def train_net(net, train_loader, val_loader, config):
     optim = torch.optim.Adam(net.parameters(), lr=5e-4)
     schedualer = torch.optim.lr_scheduler.StepLR(optim, step_size=2, gamma=0.95, last_epoch=-1)
 
-    writer = config.writer
+    from common import MyWriter
+
+    writer = MyWriter(
+        save_path=config.tb_path,
+        is_write=config.tb
+
+    )
 
     best_RRSE = 1e8
     best_info = (-1,1e8)
@@ -197,7 +220,7 @@ def train_net(net, train_loader, val_loader, config):
 
         if epoch % config.test_period == config.test_period - 1:
 
-            total_val_metrics, _, acc_time = test_net(net, val_loader, config, {'RRSE': RRSE, 'MSE': torch.nn.MSELoss()}, epoch=epoch,
+            total_val_metrics, _, acc_time = test_net(net, val_loader, config, writer, {'RRSE': RRSE, 'MSE': torch.nn.MSELoss()}, epoch=epoch,
                                           plt_visualize=config.plt_visualize, tb_visualize=config.tb)
 
             total_val_RRSE = total_val_metrics['RRSE']
@@ -206,17 +229,19 @@ def train_net(net, train_loader, val_loader, config):
 
             writer.add_scalar('val_RRSE', total_val_RRSE, epoch)
             writer.add_scalar('val_MSE', total_val_MSE, epoch)
+            writer.add_scalar('val_time', acc_time, epoch)
             val_RRSE_list.append(total_val_RRSE)
 
             if total_val_RRSE < best_RRSE:
                 best_RRSE = min(total_val_RRSE, best_RRSE)
                 best_info = (epoch, total_train_loss/total_train_items)
                 state = {
-                    'net':  copy.deepcopy(net).state_dict(),
+                    'net':  copy.deepcopy(net.state_dict()),
                     'epoch': epoch,
                     'optim': optim.state_dict(),
                     'scaler_mean': config.scaler.mean_,
-                    'scaler_var': config.scaler.var_
+                    'scaler_var': config.scaler.var_,
+                    'config': copy.deepcopy(config)
                 }
 
                 # just save the best model parameters
