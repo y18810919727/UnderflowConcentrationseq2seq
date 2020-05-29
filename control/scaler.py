@@ -7,8 +7,6 @@ import json
 
 import torch
 from common import col2Index
-from custom_dataset import Target_Col
-from custom_dataset import Control_Col
 
 class MyScaler:
     def __init__(self, scaler_mean, scaler_var, All_col, target_col, control_col, controllable=None, uncontrollable=None):

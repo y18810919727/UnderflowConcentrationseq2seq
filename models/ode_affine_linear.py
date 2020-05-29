@@ -12,7 +12,6 @@ import time
 from torch import nn
 from common import make_fcn
 
-from custom_dataset import Target_Col, Control_Col
 
 
 
@@ -23,7 +22,8 @@ class MyODEAffine(MyODE):
         super(MyODE, self).__init__(input_size, num_layers, hidden_size, out_size, config, net_type)
 
         self.f = make_fcn(hidden_size, 1, 16, hidden_size)
-        self.g = make_fcn(hidden_size, 1, 16, hidden_size * len(Control_Col))
+        self.g = make_fcn(hidden_size, 1, 16, hidden_size * len(config.Control_Col))
+        self.Control_Col = config.Control_Col
 
         class AffineGradientMoudle(nn.Module):
             def __init__(self, f, g, x_size, u_size):
@@ -45,6 +45,6 @@ class MyODEAffine(MyODE):
                 return self.f(x) + torch.matmul(self.g(x).contiguous().view(-1, self.x_size, self.u_size),
                                                 u.contiguous().view(-1, self.u_size, 1)).squeeze(-1)
 
-        self.ode_net = ODENet(AffineGradientMoudle(self.f, self.g, hidden_size, len(Control_Col)), self.config.t_step,
+        self.ode_net = ODENet(AffineGradientMoudle(self.f, self.g, hidden_size, len(self.Control_Col)), self.config.t_step,
                               self.config.interpolation)
 

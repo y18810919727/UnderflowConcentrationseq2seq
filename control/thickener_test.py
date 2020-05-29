@@ -7,7 +7,6 @@ import json
 
 import torch
 from control.thickener import Thickener
-from custom_dataset import Control_Col, Target_Col
 from config import args as config
 from control.scaler import MyScaler
 from control.cost_func import QuadraticCost
@@ -41,13 +40,20 @@ def cal_jac():
 # 注意1：这里提供了三个模型，一个affine的，两个普通的，旧的模型不能用了
 #state_dic = torch.load('./ckpt/rnn_ode_3_4_h32_cubic_transform_dopri5/best.pth')
 #state_dic = torch.load('./ckpt/GRU_ode_3_4_h32_cubic_dopri5/best.pth')
-state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_transform/best.pth')
+#state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_transform/best.pth')
+#state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_full/best.pth')
+state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_transform_full/best.pth')
+
+
 
 
 from models.model_generator import initialize_model
 
 # 保存的pth文件中直接记录着当时训练模型时的config字典
 model_config = state_dic['config']
+
+Control_Col = model_config.Control_Col
+Target_Col = model_config.Target_Col
 
 net = initialize_model(config=model_config)
 

@@ -11,9 +11,6 @@ from torch.utils.data.dataset import Dataset
 from torch.utils.data.dataloader import DataLoader
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
-#Target_Col = ['1', '11', '17']
-Target_Col = ['11', '17']
-Control_Col = ['4','5','7','15','16']
 
 class MyDataset(Dataset):
     def __init__(self,
@@ -32,7 +29,7 @@ class MyDataset(Dataset):
         if sample_dis == -1:
             sample_dis = look_back + look_forward
 
-        if look_forward == -1:
+        if look_forward == -1 or look_forward > self.data_length - look_back:
             look_forward = self.data_length - look_back
             sample_dis = self.data_length
 
@@ -41,6 +38,8 @@ class MyDataset(Dataset):
         self.look_forward = look_forward
         self.look_back = look_back
         self.data = data
+        self.Target_Col = config.Target_Col
+        self.Control_Col = config.Control_Col
 
 
         #     pre_x = data[ind:ind+look_back][Control_Col]
@@ -66,10 +65,10 @@ class MyDataset(Dataset):
         look_back = self.look_back
         look_forward = self.look_forward
 
-        pre_x = data[ind:ind+look_back][Control_Col]
-        pre_y = data[ind:ind+look_back][Target_Col]
-        forward_x = data[ind+look_back:ind+look_back+look_forward][Control_Col]
-        forward_y = data[ind+look_back:ind+look_back+look_forward][Target_Col]
+        pre_x = data[ind:ind+look_back][self.Control_Col]
+        pre_y = data[ind:ind+look_back][self.Target_Col]
+        forward_x = data[ind+look_back:ind+look_back+look_forward][self.Control_Col]
+        forward_y = data[ind+look_back:ind+look_back+look_forward][self.Target_Col]
 
         tmp = [np.asarray(x).astype(np.float32) for x in [
             pre_x,

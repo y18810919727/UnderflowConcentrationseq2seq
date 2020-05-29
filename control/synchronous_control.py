@@ -5,7 +5,6 @@ import json
 
 import torch
 from control.thickener import Thickener
-from custom_dataset import Control_Col, Target_Col
 from control.scaler import MyScaler
 from control.cost_func import QuadraticCost
 from control.model.synchronous import SynchronousController
@@ -15,6 +14,9 @@ import common
 # 更新使用的仿真模型
 
 from config import args as config
+
+Control_Col = config.Control_Col
+Target_Col = config.Target_Col
 from models.model_generator import initialize_model
 
 #model_dir = 'rnn_ode_2_3_h32'

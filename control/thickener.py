@@ -9,8 +9,9 @@ import torch
 from torch.autograd import Variable
 import pandas
 from control.scaler import MyScaler
-from custom_dataset import Target_Col
-from custom_dataset import Control_Col
+Target_Col =  ['11', '17']
+Control_Col =  ['4','5','7','15','16']
+
 from torchdiffeq import odeint
 from common import col2Index
 

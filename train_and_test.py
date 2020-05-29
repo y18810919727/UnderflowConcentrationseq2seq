@@ -10,7 +10,6 @@ import torch
 import time
 from matplotlib import pyplot as plt
 import copy
-from custom_dataset import Target_Col
 from tensorboardX import SummaryWriter
 from common import RRSE
 
@@ -54,9 +53,6 @@ def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_vi
         used_time = time.time() - cur_time
         acc_time += used_time
 
-        test_loss = critic_func(y_estimate_all, forward_y)
-        total_test_loss += float(test_loss) * pre_x.shape[1]
-        total_test_items += pre_x.shape[1]
 
         y_est_series = y_estimate_all.detach().cpu()
         y_series = forward_y.detach().cpu()
@@ -67,20 +63,25 @@ def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_vi
         y_series = config.my_scaler.unscale_target(y_series).cpu()
         y_est_series = config.my_scaler.unscale_target(y_est_series).cpu()
 
-        from custom_dataset import Target_Col
-        if len(Target_Col) == 3:
-            name = ['height', 'UC', 'Pressure']
-            unit_name = ['m', '%', 'Mpa']
-        else:
-            name = ['UC', 'Pressure']
-            unit_name = ['%', 'Mpa']
+        test_loss = critic_func(y_est_series, y_series)
+        total_test_loss += float(test_loss) * pre_x.shape[1]
+        total_test_items += pre_x.shape[1]
+
+        if config.dataset_name == 'thickener':
+            if len(config.Target_Col) == 3:
+                name = ['height', 'UC', 'Pressure']
+                unit_name = ['m', '%', 'Mpa']
+            else:
+                name = ['UC', 'Pressure']
+                unit_name = ['%', 'Mpa']
+        elif config.dataset_name == 'cstr':
+            name = ['Concentration', 'Tenp']
+            unit_name = ['%', 'C']
         if tb_visualize:
-            for y_index in range(len(Target_Col)):
+            for y_index in range(len(config.Target_Col)):
                 for series_index in range(min(config.batch_size, pre_x.shape[1])):
 
                     # ODE method performs best in group : (1-0)
-                    if i!=1 or series_index != 0:
-                        continue
 
                     fig = plt.figure(figsize=(5, 4))
                     #plt.ylim(-3,3)
@@ -111,7 +112,7 @@ def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_vi
         if plt_visualize and pre_x.shape[1]>=3:
             plt.figure(figsize=(10, 6))
 
-            for y_index in range(len(Target_Col)):
+            for y_index in range(len(config.Target_Col)):
                 for series_index in range(min(config.batch_size, 3)):
                     plt.subplot('33'+str(series_index+y_index*3+1))
                     plt.plot(y_series[:, series_index, y_index])
@@ -138,7 +139,7 @@ def train_net(net, train_loader, val_loader, config):
         critic = torch.nn.MSELoss()
     elif config.loss_func == 'gauss':
         from common import GaussLoss
-        critic = GaussLoss(len(Target_Col), config)
+        critic = GaussLoss(len(config.Target_Col), config)
         sigma_optim = torch.optim.Adam([critic.sigma])
 
 
