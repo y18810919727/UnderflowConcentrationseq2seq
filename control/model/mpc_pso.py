@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import torch
+from config import args
 
 class Particle:
     # 初始化
@@ -35,7 +36,7 @@ class Particle:
 
 
 class PSO:
-    def __init__(self, dim, size, iter_num, x_max, max_vel, evn, best_fitness_value=float('Inf'), C1=2, C2=2, W=1, error_limit=5e-3):
+    def __init__(self, dim, size, iter_num, x_max, max_vel, model_pre, best_fitness_value=float('Inf'), C1=2, C2=2, W=1, error_limit=5e-3):
         self.C1 = C1
         self.C2 = C2
         self.W = W
@@ -44,11 +45,16 @@ class PSO:
         self.iter_num = iter_num  # 迭代次数
         self.x_max = x_max
         self.max_vel = max_vel  # 粒子最大速度
-        self.evn = evn
+        self.model_pre = model_pre
         self.best_fitness_value = best_fitness_value
         self.best_position = torch.FloatTensor([0.0 for i in range(dim)])  # 种群最优位置
         # self.fitness_val_list = []  # 每次迭代最优适应值
         self.error_limit = error_limit
+
+        self.x = self.model_pre.x
+        self.y_target = self.model_pre.scaler.scale_target(torch.FloatTensor(args.y_target))
+        self.Q = torch.diag(torch.FloatTensor([10.0, 0.001]))
+        self.R = torch.diag(torch.FloatTensor([0.001, 0.001, 0.001]))
 
     def set_bestFitnessValue(self, value):
         self.best_fitness_value = value
@@ -61,6 +67,16 @@ class PSO:
 
     def get_bestPosition(self):
         return self.best_position
+
+    def fit_fun(self, du):
+        du = torch.unsqueeze(du, dim=0)
+        u = self.last_u + du
+        y, dx_dt = self.model_pre.f_pre(self.x, u)
+        y_det = y - self.y_target
+        y_cost = torch.sum(y_det @ self.Q @ y_det.T, dim=1)
+        u_cost = torch.sum(du @ self.R @ du.T, dim=1)
+        cost = (y_cost + u_cost).data.numpy()[0]
+        return cost
 
     # 更新速度
     def update_vel(self, part):
@@ -79,7 +95,7 @@ class PSO:
         # for i in range(self.dim):
         pos_value = part.get_pos() + part.get_vel()
         part.set_pos(pos_value)
-        value = self.evn.fit_fun(part.get_pos())
+        value = self.fit_fun(part.get_pos())
         if value < part.get_fitness_value():
             part.set_fitness_value(value)
             part.set_best_pos(part.get_pos())
@@ -91,7 +107,7 @@ class PSO:
         # 对种群进行初始化
         self.Particle_list = [Particle(self.x_max, self.max_vel, self.dim) for i in range(self.size)]
         for part in self.Particle_list:
-            part.set_fitness_value(self.evn.fit_fun(part.get_pos()))
+            part.set_fitness_value(self.fit_fun(part.get_pos()))
         self.best_fitness_value = 100
 
         for i in range(self.iter_num):

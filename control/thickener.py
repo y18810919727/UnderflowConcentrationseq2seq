@@ -15,6 +15,7 @@ from torchdiffeq import odeint
 from common import col2Index
 from decimal import Decimal
 from config import args
+import random
 
 class Thickener():
 
@@ -37,10 +38,13 @@ class Thickener():
         :param m: 可控量维度
         :param batch_size: 控制实验中一般设为1
         """
-
+        if random_seed is None:
+            random_seed = random.randint(0, 1000000)
+            print('random_seed:'+str(random_seed))
         self.random_seed = random_seed
         if config is None:
             from config import args as config
+        config.min_future_length = 20000
         self.config = config
 
         # Time step
@@ -55,10 +59,6 @@ class Thickener():
         self.fcn = model.fc
         self.scaler = scaler
 
-        self.last_u = torch.FloatTensor([0, 0, 0])
-        self.y_target = self.scaler.scale_target(torch.FloatTensor(args.y_target))
-        self.Q = torch.diag(torch.FloatTensor([10.0, 0.01]))
-        self.R = torch.diag(torch.FloatTensor([0.001, 0.001, 0.001]))
 
         ori_data = np.array(pandas.read_csv(config.DATA_PATH))
 
@@ -83,6 +83,7 @@ class Thickener():
 
         # x: (batch_size, hidden_num),
         # begin_index: (batch_size), 记录位置用于后续生成外部噪音c
+
         self.x, self.begin_index = self.initial_hidden_state(self.random_seed, self.scaled_data)
         self.hidden_num = self.x.shape[1]
 
@@ -100,20 +101,13 @@ class Thickener():
 
         self.c = self.c_u_seq[0][:, self.uncontrollable_in_input_index]
 
-    def fit_fun(self, du):
-        du = torch.unsqueeze(du, dim=0)
-        u = self.last_u + du
-        y, dx_dt = self.f(u)
-        y_det = y - self.y_target
-        y_cost = torch.sum(y_det @ self.Q @ y_det.T, dim=1)
-        u_cost = torch.sum(du @ self.R @ du.T, dim=1)
-        cost = (y_cost + u_cost).data.numpy()[0]
-        return cost
 
-
-    def update_c_u_seq(self, u):
+    def update_c_u_seq(self, u, is_pre = False):
         # 寻找当前生成c的下标
-        self.input_position = int(self.t / self.config.t_step)
+        if is_pre:
+            self.input_position = max(int(self.t / self.config.t_step) - 1, 0)
+        else:
+            self.input_position = int(self.t / self.config.t_step)
         # 更新指定下标位置及相邻写一个位置的外部输入量u
         self.c_u_seq[self.input_position, :, self.controllable_in_input_index] = u
         self.c = self.c_u_seq[self.input_position][:, self.uncontrollable_in_input_index]
@@ -122,7 +116,7 @@ class Thickener():
             self.c_u_seq[self.input_position + 1, :, self.controllable_in_input_index] = u
 
 
-    def f(self, u, forward=False):
+    def f(self, u):
         """
         根据自己生产的扰动量c以及输入控制量u，更新状态x并给出x的导数
         :param u: (bs, m) or (m,)
@@ -131,26 +125,23 @@ class Thickener():
         if u.shape is (self.m,):
             u = u.unsqueeze(dim=0)
 
-        if forward:
-            self.last_u = u
-
         assert self.batch_size == u.shape[0]
 
         self.update_c_u_seq(u)
 
-        # 计算f_u_grad
-        ode_input = Variable(torch.cat((self.x, self.c_u_seq[self.input_position]), dim=1), requires_grad=True)
-        ode_ouput = self.ode_net.grad_module(ode_input)
-        if args.x_decode > 0:
-            ode_ouput = self.fcn(ode_ouput)
-        jacT = torch.zeros(ode_input.shape[1], ode_ouput.shape[1])
-        for i in range(ode_ouput.shape[1]):
-            gradients = torch.zeros(1, ode_ouput.shape[1])
-            gradients[:, i] = 1
-            j = torch.autograd.grad(ode_ouput, ode_input, grad_outputs=gradients, retain_graph=True)
-            jacT[:, i:i + 1] = j[0].T
-        f_u_index = [i+self.hidden_num for i in self.controllable_in_input_index]
-        f_u_grad = jacT[f_u_index, :]
+        # # 计算f_u_grad
+        # ode_input = Variable(torch.cat((self.x, self.c_u_seq[self.input_position]), dim=1), requires_grad=True)
+        # ode_ouput = self.ode_net.grad_module(ode_input)
+        # if args.x_decode > 0:
+        #     ode_ouput = self.fcn(ode_ouput)
+        # jacT = torch.zeros(ode_input.shape[1], ode_ouput.shape[1])
+        # for i in range(ode_ouput.shape[1]):
+        #     gradients = torch.zeros(1, ode_ouput.shape[1])
+        #     gradients[:, i] = 1
+        #     j = torch.autograd.grad(ode_ouput, ode_input, grad_outputs=gradients, retain_graph=True)
+        #     jacT[:, i:i + 1] = j[0].T
+        # f_u_index = [i+self.hidden_num for i in self.controllable_in_input_index]
+        # f_u_grad = jacT[f_u_index, :]
 
         # 更新ode求解模型中的控制输入序列
 
@@ -175,11 +166,10 @@ class Thickener():
             from common import discrete_odeint
             x = discrete_odeint(self.ode_net, self.c_u_seq, self.x, t, rtol=self.config.rtol, atol=self.config.atol)[1]
 
-        if forward:
-            self.t = Decimal(str(self.t)) + Decimal(str(self.T))
-            self.t = float(str(self.t))
-            # self.last_u = u
-            self.x = x
+
+        self.t = Decimal(str(self.t)) + Decimal(str(self.T))
+        self.t = float(str(self.t))
+        self.x = x
 
         if args.x_decode > 0:
             x_decode = self.fcn(x).data
@@ -188,6 +178,38 @@ class Thickener():
 
         return x, dx_dt
 
+    def f_pre(self, x, u):
+        if u.shape is (self.m,):
+            u = u.unsqueeze(dim=0)
+
+        assert self.batch_size == u.shape[0]
+
+        self.update_c_u_seq(u)
+
+        def linear_fit(a, b, x):
+            assert 0 <= x <= 1
+            return a + (b-a)*x
+
+        # 拿出t时刻顺时的外部变化量，用于计算x的顺时导数
+        cur_c_u = linear_fit(
+            self.c_u_seq[self.input_position],
+            self.c_u_seq[min(self.input_position + 1, len(self.c_u_seq) - 1)],
+            (self.t - self.config.t_step * self.input_position) / self.config.t_step
+        )
+        t = torch.FloatTensor([self.t, self.t + self.T])
+
+        with torch.no_grad():
+            # 计算导数
+            f_input = torch.cat([x, cur_c_u], dim=1)
+            # print(str(f_input.shape))
+            dx_dt = self.ode_net.grad_module(f_input)
+            # 计算t+T时刻的系统状态1
+            from common import discrete_odeint
+            x = discrete_odeint(self.ode_net, self.c_u_seq, x, t, rtol=self.config.rtol, atol=self.config.atol)[1]
+
+        x_decode = self.fcn(x).data
+        dx_dt = self.fcn(dx_dt).data
+        return x_decode, dx_dt
 
     def initial_hidden_state(self, random_seed, scaled_data):
 
