@@ -7,6 +7,7 @@ import json
 
 import torch
 from control.scaler import MyScaler
+from config import args as config
 
 class CostFuncBase:
     def __init__(self, fcn, config=None):
@@ -47,12 +48,11 @@ class QuadraticCost(CostFuncBase):
             # 03.29更新：直接拿归一化的数据计算cost更方便，跑出实验后做曲线可视化时再反归一化回来
             # 这些参数我目前是随机定的，可以根据实验结果微调
             config = {
-                'Q': torch.diag(torch.FloatTensor([1.0, 0.01])),
+                'Q': torch.diag(torch.FloatTensor([10.0, 0.001])),
                 'R': torch.diag(torch.FloatTensor([0.01, 0.01, 0.01])),
                 'u_mid': torch.FloatTensor([0, 0, 0]),
                 'n': 2,
                 'm': 3,
-                'EPS': 1e-3,
             }
         super(QuadraticCost, self).__init__(fcn, config)
 
@@ -63,30 +63,17 @@ class QuadraticCost(CostFuncBase):
         if len(x.shape) == 1:
             x.unsqueeze(dim=0)
         assert x.shape[0] == u.shape[0] and u.shape[1] == self.m
+
         y = self.fcn(x)
 
         y_det = y-self.y_target
         u_det = u-self.u_mid
-        y_cost = torch.sum(y_det.matmul(self.Q).matmul(y_det.T), dim=1)
+        # u_det = u - self.last_u
+        y_cost = torch.sum(y_det @ self.Q @ y_det.T, dim=1)
         u_cost = torch.sum(u_det.matmul(self.R).matmul(u_det.T), dim=1)
+        print('y_cost:'+str(y_cost.data[0])+'; u_cost:'+str(u_cost.data[0]))
         return y_cost + u_cost
 
-    def solve_partial_equation(self, w, df_du_func, last_u):
-        u = last_u
-        i = 0
-        while True:
-            i += 1
-            u_grad = df_du_func(u, w)
-            # print(u_grad.data)
-            new_u = u_grad.matmul(self.R.inverse()) / 2
-            # print(new_u.data)
-            # new_u = u - u_grad.matmul(self.R)
-            if torch.dist(new_u, u) < self.config['EPS']:
-                break
-            if i > 2000:
-                break
-            u = new_u
-        return new_u
 
 
 

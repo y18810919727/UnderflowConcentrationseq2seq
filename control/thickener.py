@@ -14,6 +14,8 @@ Control_Col =  ['4','5','7','15','16']
 
 from torchdiffeq import odeint
 from common import col2Index
+from decimal import Decimal
+from config import args
 
 class Thickener():
 
@@ -21,7 +23,7 @@ class Thickener():
                  model,
                  scaler: MyScaler,
                  random_seed=None,
-                 T=0.01,
+                 T= 1,
                  m=3,
                  batch_size=1,
                  config=None
@@ -45,13 +47,19 @@ class Thickener():
         # Time step
         self.T = T
         self.t = 0
+        self.pi = 3.14159265359
         self.batch_size = batch_size
 
         self.rnn = model.rnn
         self.ode_net = model.ode_net
         self.m = m
-
+        self.fcn = model.fc
         self.scaler = scaler
+
+        self.last_u = torch.FloatTensor([0, 0, 0])
+        self.y_target = self.scaler.scale_target(torch.FloatTensor(args.y_target))
+        self.Q = torch.diag(torch.FloatTensor([10.0, 0.01]))
+        self.R = torch.diag(torch.FloatTensor([0.001, 0.001, 0.001]))
 
         ori_data = np.array(pandas.read_csv(config.DATA_PATH))
 
@@ -79,12 +87,29 @@ class Thickener():
         self.x, self.begin_index = self.initial_hidden_state(self.random_seed, self.scaled_data)
         self.hidden_num = self.x.shape[1]
 
+        # self.begin_index = [9680]
+
+        print('begin_index:' + str(self.begin_index))
+
         self.c_u_seq = torch.stack(
             [torch.FloatTensor(self.scaled_data[ind:ind+config.min_future_length, self.input_index]) for ind in self.begin_index],
             dim=1
         )
 
+        if args.constant_noise > 0:
+            self.c_u_seq[:, :, self.uncontrollable_in_input_index] = torch.FloatTensor([0,0])
+
         self.c = self.c_u_seq[0][:, self.uncontrollable_in_input_index]
+
+    def fit_fun(self, du):
+        du = torch.unsqueeze(du, dim=0)
+        u = self.last_u + du
+        y, dx_dt = self.f(u)
+        y_det = y - self.y_target
+        y_cost = torch.sum(y_det @ self.Q @ y_det.T, dim=1)
+        u_cost = torch.sum(du @ self.R @ du.T, dim=1)
+        cost = (y_cost + u_cost).data.numpy()[0]
+        return cost
 
 
     def update_c_u_seq(self, u):
@@ -97,7 +122,8 @@ class Thickener():
         if self.input_position + 1 < len(self.c_u_seq):
             self.c_u_seq[self.input_position + 1, :, self.controllable_in_input_index] = u
 
-    def f(self, u):
+
+    def f(self, u, forward=False):
         """
         根据自己生产的扰动量c以及输入控制量u，更新状态x并给出x的导数
         :param u: (bs, m) or (m,)
@@ -106,6 +132,9 @@ class Thickener():
         if u.shape is (self.m,):
             u = u.unsqueeze(dim=0)
 
+        if forward:
+            self.last_u = u
+
         assert self.batch_size == u.shape[0]
 
         self.update_c_u_seq(u)
@@ -113,6 +142,8 @@ class Thickener():
         # 计算f_u_grad
         ode_input = Variable(torch.cat((self.x, self.c_u_seq[self.input_position]), dim=1), requires_grad=True)
         ode_ouput = self.ode_net.grad_module(ode_input)
+        if args.x_decode > 0:
+            ode_ouput = self.fcn(ode_ouput)
         jacT = torch.zeros(ode_input.shape[1], ode_ouput.shape[1])
         for i in range(ode_ouput.shape[1]):
             gradients = torch.zeros(1, ode_ouput.shape[1])
@@ -142,25 +173,33 @@ class Thickener():
             # 计算导数
             dx_dt = self.ode_net.grad_module(torch.cat([self.x, cur_c_u], dim=1))
             # 计算t+T时刻的系统状态1
-
             from common import discrete_odeint
-            self.x = discrete_odeint(self.ode_net, self.c_u_seq, self.x, t, rtol=self.config.rtol, atol=self.config.atol)[1]
+            x = discrete_odeint(self.ode_net, self.c_u_seq, self.x, t, rtol=self.config.rtol, atol=self.config.atol)[1]
 
+        if forward:
+            self.t = Decimal(str(self.t)) + Decimal(str(self.T))
+            self.t = float(str(self.t))
+            # self.last_u = u
+            self.x = x
 
-        self.t += self.T
-        return self.x, dx_dt, f_u_grad
+        if args.x_decode > 0:
+            x_decode = self.fcn(x).data
+            dx_dt = self.fcn(dx_dt).data
+            return x_decode, dx_dt
+
+        return x, dx_dt
 
 
     def initial_hidden_state(self, random_seed, scaled_data):
 
 
         np.random.seed(random_seed)
-        print('random_seed:' + str(random_seed))
         # 定义batch_size 个随机起点
         begin_index = np.random.randint(0, self.length - self.config.look_back + 1 - self.config.min_future_length, self.batch_size)
         # begin_index = np.random.randint(0, 10, self.batch_size)
 
         # 拿出历史数据，准备使用rnn编码
+
         y = [torch.FloatTensor(scaled_data[ind:ind+self.config.look_back, self.target_index]) for ind in begin_index]
         u = [torch.FloatTensor(scaled_data[ind:ind+self.config.look_back, self.input_index]) for ind in begin_index]
         y = torch.stack(y,dim=1)

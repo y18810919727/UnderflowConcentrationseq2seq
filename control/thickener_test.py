@@ -10,31 +10,21 @@ from control.thickener import Thickener
 from config import args as config
 from control.scaler import MyScaler
 from control.cost_func import QuadraticCost
+import time
+from tensorboardX import SummaryWriter
+from control.scaler import MyScaler as scaler
+from models.model_generator import initialize_model
+import common
 
-
-def cal_jac():
-    x = np.arange(1, 3, 1)
-    x = torch.from_numpy(x).reshape(len(x), 1)
-    x = x.float()
-    x.requires_grad = True
-
-    w1 = torch.randn((2, 2), requires_grad=False)
-    y = w1 @ x
-
-    print(w1)
-    jacT = torch.zeros(2, 2)
-    for i in range(2):
-        output = torch.zeros(2, 1)
-        output[i] = 1.
-        j = torch.autograd.grad(y, x, grad_outputs=output, retain_graph=True)
-        a = j[0].shape
-        b = jacT[:, i:i + 1].shape
-        c = jacT[:, i].shape
-        jacT[:, i:i + 1] = j[0]
+if config.is_write > 0:
+    writer = SummaryWriter(os.path.join('logs', 'ode_control', str(
+        time.strftime("%Y%m%d%H%M%S", time.localtime())) + '__' + 'test_noise_new_model'))
 
 # 载入pth
 
-#cal_jac()
+
+print(config)
+net = initialize_model(config)
 
 
 # 注意1：这里提供了三个模型，一个affine的，两个普通的，旧的模型不能用了
@@ -57,8 +47,8 @@ Target_Col = model_config.Target_Col
 
 net = initialize_model(config=model_config)
 
-# net = MyODE(input_size=len(Target_Col+Control_Col),
-#             num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(Target_Col), net_type=config.net_type)
+
+
 net.load_state_dict(state_dic['net'])
 net.ode_net.interpolation_kind = 'slinear'
 
@@ -72,15 +62,41 @@ my_scaler = MyScaler(_mean, _var, model_config.all_col,  Target_Col, Control_Col
 # 注意3: Thickener 的构造函数中需要添加config参数
 thickener = Thickener(net, my_scaler, None, config=model_config)
 
-# 随机生成控制量进行测试
-u = torch.rand(1, 3)
-nx, x_grad, f_u_grad = thickener.f(u)
-print(nx)
-
+# quadratic_cost = QuadraticCost(net.fc)
+# quadratic_cost.y_target = my_scaler.scale_target(torch.FloatTensor(config.y_target))
+# step = 0
+# u = torch.FloatTensor([[0.2, 0.1, 0.2]])
+# while True:
+#     if step % 6000 == 1:
+#         u = torch.rand(1, 3)
+#     x, x_grad, f_u_grad = thickener.f(u)
+#     print('f_u_grad:'+str(f_u_grad.data.numpy().tolist()))
+#     # 定义效用计算器，计算效用值
+#     utility = quadratic_cost.get_cost(x, u)
+#     u_unscale = my_scaler.unscale_controllable(u)
+#     if config.is_write > 0:
+#         print('strp-'+str(step))
+#         writer.add_scalar('Critic/Reward', utility.data[0], step)
+#         # writer.add_scalar('Critic/Value', critic_value.data[0], step)
+#
+#         for i in range(len(thickener.controllable_in_input_index)):
+#             writer.add_scalar('Actor/u' + str(i), u_unscale.data[0][i], step)
+#
+#         y = quadratic_cost.fcn(x)
+#         y = my_scaler.unscale_target(y)
+#         writer.add_scalar('State/Concentration of underﬂow', y.data[0][0], step)
+#         writer.add_scalar('State/Height of mud layer', y.data[0][1], step)
+#
+#         c_unscale = my_scaler.unscale_uncontrollable(thickener.c)
+#         writer.add_scalar('Noise/noise1', c_unscale.data[0][0], step)
+#         writer.add_scalar('Noise/noise2', c_unscale.data[0][1], step)
+#     step += 1
+#
 # 定义效用计算器，计算效用值
 quadratic_cost = QuadraticCost(fcn=net.fc)
 quadratic_cost.y_target = my_scaler.scale_target(torch.FloatTensor(config.y_target))
 utility = quadratic_cost.get_cost(nx, u)
 print(utility)
+
 
 
