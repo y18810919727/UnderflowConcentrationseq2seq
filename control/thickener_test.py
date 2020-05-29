@@ -7,7 +7,6 @@ import json
 
 import torch
 from control.thickener import Thickener
-from custom_dataset import Control_Col, Target_Col
 from config import args as config
 from control.scaler import MyScaler
 from control.cost_func import QuadraticCost
@@ -27,7 +26,9 @@ model_dic = {
 test = 'model1'
 #state_dic = torch.load('./ckpt/rnn_ode_3_4_h32_cubic_transform_dopri5/best.pth')
 #state_dic = torch.load('./ckpt/GRU_ode_3_4_h32_cubic_dopri5/best.pth')
+
 state_dic = torch.load(model_dic[test])
+
 
 if config.is_write > 0:
     if config.constant_noise > 0:
@@ -41,6 +42,9 @@ from models.model_generator import initialize_model
 
 # 保存的pth文件中直接记录着当时训练模型时的config字典
 model_config = state_dic['config']
+
+Control_Col = model_config.Control_Col
+Target_Col = model_config.Target_Col
 
 net = initialize_model(config=model_config)
 

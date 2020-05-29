@@ -8,7 +8,6 @@ import json
 import torch
 from models.diff import DiffNet
 from models.ode import ODENet
-from custom_dataset import Target_Col, Control_Col
 from models.asrnn import ASRNN
 
 from torch import nn
@@ -31,7 +30,7 @@ class HiddenRNN(DiffNet):
         else:
             raise AttributeError("Please give a type of rnn net. lstm or rnn or GRU or asrnn")
 
-        self.hidden_rnn = Model_Class(input_size=len(Control_Col), num_layers=num_layers, hidden_size=hidden_size)
+        self.hidden_rnn = Model_Class(input_size=len(config.Control_Col), num_layers=num_layers, hidden_size=hidden_size)
 
 
     def forward(self, input, only_forward_y=True):

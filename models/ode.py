@@ -12,7 +12,6 @@ from torchdiffeq import odeint as odeint
 from torch.nn import RNN
 from models.diff import DiffNet
 from torch import nn
-from custom_dataset import Target_Col, Control_Col
 
 class ODENet(nn.Module):
     def __init__(self, grad_module, t_step, interpolation_kind):
@@ -98,7 +97,7 @@ class MyODE(DiffNet):
 
         modules_list = []
         hidden_sizes = num_layers * [hidden_size]
-        layer_sizes = [hidden_size+len(Control_Col)] + hidden_sizes
+        layer_sizes = [hidden_size+len(config.Control_Col)] + hidden_sizes
         self.net_type = net_type
 
 

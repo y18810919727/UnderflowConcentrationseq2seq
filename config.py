@@ -54,12 +54,16 @@ parser.add_argument('--con_algorithm', type=str, default='synchronous')
 parser.add_argument('--no_hidden_diff', action='store_true', default=False)
 parser.add_argument('--min_future_length', type=int, default=30000)
 parser.add_argument('--con_t_range', type=float, default=1000*10.0/60)
+parser.add_argument('--dataset_name', type=str, default='thickener', help='thickener or cstr')
+parser.add_argument('--Target_Col', type=list, default=['11', '17'])
+parser.add_argument('--Control_Col', type=list, default=['4','5','7','15','16'])
 parser.add_argument('--controllable', type=list, default=['5','7','15'])
 parser.add_argument('--uncontrollable', type=list, default=['4', '16'])
-parser.add_argument('--con_batch_size', type=int, default=1)
 parser.add_argument('--all_col', type=list, default=['1','4','5','7','11','15','16','17','18','19','20','21','22'])
-parser.add_argument('--y_target', type=list, default=[62, 32])
-parser.add_argument('--constant_noise', type=int, default=1)
+
+parser.add_argument('--con_batch_size', type=int, default=1)
+parser.add_argument('--y_target', type=list, default=[63, 32])
+parser.add_argument('--constant_noise', type=int, default=0)
 parser.add_argument('--is_write', type=int, default=1)
 parser.add_argument('--x_decode', type=int, default=1)
 parser.add_argument('--phi_input', type=int, default=1)
@@ -67,6 +71,13 @@ parser.add_argument('--mpc_control', type=int, default=1)
 parser.add_argument('--action_constraint', type=int, default=0)
 
 args = parser.parse_args()
+if args.dataset_name == 'cstr':
+    args.Target_Col = ['1', '2']
+    args.Control_Col = ['0']
+    args.all_col = ['0', '1', '2']
+    args.controllable = ['0']
+    args.uncontrollable = []
+
 
 if args.epochs == 0:
     args.epochs = 1e8
@@ -118,6 +129,10 @@ data = pd.read_csv(args.DATA_PATH)
 args.scaler = StandardScaler().fit(data)
 
 from control.scaler import MyScaler
-from custom_dataset import Target_Col, Control_Col
+Target_Col = args.Target_Col
+Control_Col = args.Control_Col
+
+# import pdb
+# pdb.set_trace()
 args.my_scaler = MyScaler(args.scaler.mean_, args.scaler.var_, args.all_col, Target_Col, Control_Col, args.controllable, args.uncontrollable)
 

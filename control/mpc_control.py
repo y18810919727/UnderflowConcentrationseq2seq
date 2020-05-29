@@ -86,12 +86,11 @@ def load_model(state_dic, random_seed=None):
 
 if __name__ == '__main__':
     # 注意1：这里提供了三个模型，一个affine的，两个普通的，旧的模型不能用了
-    # state_dic = torch.load('./ckpt/rnn_ode_3_4_h32_cubic_transform_dopri5/best.pth')
-    # state_dic = torch.load('./ckpt/GRU_ode_3_4_h32_cubic_dopri5/best.pth')
-    # state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_transform/best.pth')
+    # state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_full/best.pth')
+    # state_dic = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_transform_full/best.pth')
 
-    state_dic_prediction = torch.load('./ckpt/rnn_ode_3_4_h32_cubic_transform_dopri5/best.pth')
-    state_dic_controlled = torch.load('./ckpt/rnn_ode_3_4_h32_cubic_transform_dopri5/best.pth')
+    state_dic_prediction = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_full/best.pth')
+    state_dic_controlled = torch.load('./ckpt/rnn_ode_affine_3_4_cubic_full/best.pth')
 
     print(config)
 
