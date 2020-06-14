@@ -6,12 +6,12 @@ import time
 from control.thickener import Thickener
 from control.scaler import MyScaler
 import common
-from control.model.mpc_pso import PSO
+from control.model.mpc_pso_action_constraint import PSO
 from tensorboardX import SummaryWriter
 from config import args as config
 from models.model_generator import initialize_model
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-import torch.nn as nn
+
 
 class MPC_Control:
     def __init__(self, pso, evn):
@@ -29,7 +29,7 @@ class MPC_Control:
                 time.strftime("%Y%m%d%H%M%S", time.localtime())) + '__' + parameter_name + '__T=' + str(
                 self.evn.T)) + '__W=' + str(self.pso.W) \
                                         + '__C1==' + str(self.pso.C1) + '__C2==' + str(self.pso.C2) + '__size=' + str(
-                self.pso.size)+'_noise_pre='+str(config.noise_pre)+'_debug')
+                self.pso.size)+'_action_constraint')
 
         print(parameter_name)
 
@@ -41,19 +41,22 @@ class MPC_Control:
         rmse_list = []
         danger = 0
         while (True):
-            if step == 2 or step == 1 or step == 15:
-                print(str(self.pso.model_pre.c_lookback.shape))
-            bestFitnessValue, du = self.pso.update()
-            u = self.last_u + torch.unsqueeze(torch.FloatTensor(du), dim=0)
+            bestFitnessValue, u = self.pso.update()
+            u = self.last_u + torch.unsqueeze(torch.FloatTensor(u), dim=0)
             x, dxdt = self.evn.f(u)
             y = self.evn.scaler.unscale_target(x)
             y_list.append(y.data.numpy().tolist()[0][0])
-            # if abs(y.data[0][0] - config.y_target[0]) > 0.1 and step > 20:
-            #     danger = danger + 1
-            # elif abs(y.data[0][0] - config.y_target[0]) < 0.1 and danger > 0:
-            #     danger = 0
-            # if danger == 12:
-            #     u = torch.FloatTensor([[0, 0, 0]])
+            if abs(y.data[0][0] - config.y_target[0]) > 0.15:
+                danger = danger + 1
+            elif abs(y.data[0][0] - config.y_target[0]) < 0.15 and danger > 0:
+                danger = 0
+                self.pso.size = 30
+                self.pso.iter_num = 15
+                self.pso.x_max = 0.3
+            if danger == 20:
+                self.pso.size = 50
+                self.pso.iter_num = 25
+                self.pso.x_max = 0.8
             self.last_u = u
             print(
                 'step' + str(step) + ':' + 'state:' + str(y.data.numpy().tolist()) + '\ncost:' + str(bestFitnessValue))
@@ -80,7 +83,6 @@ class MPC_Control:
             self.pso.last_u = u
             self.pso.model_pre.t = self.evn.t
             self.pso.x = self.evn.x
-            self.pso.model_pre.update_c_lookback()
 
             if step % 100 == 0:
                 mse = mean_squared_error(y_list, [config.y_target[0]] * len(y_list))
@@ -133,14 +135,12 @@ if __name__ == '__main__':
     # random_seed = 539667
     # random_seed = 82791
     random_seed = 55630
-    # random_seed = 37302  # 23473
-    # random_seed = None
 
     thickener_controlled = load_model(state_dic_controlled, random_seed=random_seed)
     thickener_prediction = load_model(state_dic_prediction, random_seed=thickener_controlled.random_seed)
 
 
-    pso = PSO(dim=3, size=40, iter_num=15, model_pre=thickener_prediction, x_max=0.3, max_vel=0.2,
+    pso = PSO(dim=3, size=30, iter_num=15, model_pre=thickener_prediction, x_max=1, max_vel=0.2,
               best_fitness_value=100)
     # pso = PSO(dim=3, size=50, iter_num=10, evn=thickener, x_max=10, max_vel=5, best_fitness_value=100)
 
