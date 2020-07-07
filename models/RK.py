@@ -9,7 +9,17 @@ import torch
 
 from models.ode import ODENet
 
-from models.ode import MyODE
+from config import args
+if args.ode_version == '1':
+    from models.ode import MyODE
+elif args.ode_version == '2':
+    from models.ode_v2 import MyODEV2 as MyODE
+
+elif args.ode_version == '3':
+    from models.ode_v3 import MyODEV3 as MyODE
+
+elif args.ode_version == '4':
+    from models.ode_v4 import MyODEV4 as MyODE
 
 
 

@@ -13,12 +13,15 @@ import torch
 import config
 from tqdm import tqdm
 import time
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import torch
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data.dataloader import DataLoader
 import pandas as pd
 from matplotlib import pyplot as plt
+import traceback
 
 
 from train_and_test import test_net, train_net
@@ -53,11 +56,13 @@ def main(config):
     data, scaled_data, train_loader, val_loader, test_loader = initialize_dataset(config)
     cal_params_sum(net)
     if config.is_train:
-        net, train_loss_list, val_loss_list = train_net(net, train_loader, val_loader, config)
-        plt.plot(np.arange(1,config.epochs+1,1), train_loss_list)
-        plt.plot(np.arange(config.test_period, config.epochs+1, config.test_period), val_loss_list)
-        plt.legend(['Train loss', 'Test loss'])
-        plt.show()
+        from common import SimpleLogger
+        logging = SimpleLogger(os.path.join('ckpt', config.save_dir, 'log.out'))
+        try:
+            net, train_loss_list, val_loss_list = train_net(net, train_loader, val_loader, test_loader, logging, config)
+        except Exception as e:
+            var = traceback.format_exc()
+            logging(var)
     # elif config.test_all:
     #
     #     state = torch.load(os.path.join('ckpt', config.save_dir, str(config.test_model)+'.pth'))

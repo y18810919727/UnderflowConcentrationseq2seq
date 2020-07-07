@@ -10,6 +10,26 @@ import torch
 
 from tensorboardX import SummaryWriter
 
+class SimpleLogger(object):
+    def __init__(self, f, header='#logger output'):
+        dir = os.path.dirname(f)
+        #print('test dir', dir, 'from', f)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        with open(f, 'w') as fID:
+            fID.write('%s\n'%header)
+        self.f = f
+
+    def __call__(self, *args):
+        #standard output
+        print(*args)
+        #log to file
+        try:
+            with open(self.f, 'a') as fID:
+                fID.write(' '.join(str(a) for a in args)+'\n')
+        except:
+            print('Warning: could not log to', self.f)
+
 def cal_params_sum(model):
     total_params = sum(p.numel() for p in model.parameters())
     print(f'{total_params:,} total parameters.')
@@ -26,6 +46,11 @@ class MyWriter(SummaryWriter):
     def add_scalar(self, tag, scalar_value, global_step=None, walltime=None):
         if self.is_write:
             SummaryWriter.add_scalar(self, tag, scalar_value, global_step, walltime)
+
+    def add_scalars(self, tag, scalars_dict, global_step=None, walltime=None):
+        if self.is_write:
+            for key in scalars_dict.keys():
+                SummaryWriter.add_scalar(self, tag+key, scalars_dict[key], global_step, walltime)
 
     def add_pr_curve(self, tag, labels, predictions, global_step=None,
                      num_thresholds=127, weights=None, walltime=None):
@@ -172,7 +197,8 @@ def parser_dir(dir_name, config):
 def discrete_odeint(ode_net, c_u_seq, y0, t, rtol=1e-7, atol=1e-9, method=None, options=None):
 
 
-    from torchdiffeq import odeint
+    #from torchdiffeq import odeint_adjoint as odeint
+    from torchdiffeq import odeint as odeint
 
     ode_net.fit_c_u_seq(c_u_seq, t)
     res = odeint(ode_net, y0, t, rtol=rtol, atol=atol, method=method, options=options)

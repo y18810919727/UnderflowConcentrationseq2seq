@@ -95,22 +95,34 @@ def initialize_dataset(config):
     scaled_data = scaler.transform(data)
     [train_size, validate_size, test_size] = [int(len(scaled_data)*r) for r in [0.7, 0.15, 0.15]]
 
-    scaled_data_train = scaled_data[:train_size]
-    scaled_data_validate = scaled_data[train_size:validate_size+train_size]
-    scaled_data_test = scaled_data[-test_size:]
+    if config.data_inv:
+        half_train_size = int(train_size/2)
+        scaled_data_train = np.concatenate([
+            scaled_data[0:half_train_size], scaled_data[-(train_size-half_train_size):]
+        ], axis=0)
+
+        scaled_data_validate = scaled_data[half_train_size:validate_size+half_train_size]
+        scaled_data_test = scaled_data[half_train_size + validate_size: half_train_size + validate_size + test_size]
+
+    else:
+        scaled_data_train = scaled_data[:train_size]
+        scaled_data_validate = scaled_data[train_size:validate_size+train_size]
+        scaled_data_test = scaled_data[-test_size:]
+
 
     train_dataset = MyDataset(pd.DataFrame(scaled_data_train, columns=data.columns), config,
                               look_back=config.look_back, look_forward=config.look_forward,
                               sample_dis=config.sample_dis)
 
-    validate_dataset = MyDataset(pd.DataFrame(scaled_data_validate, columns=data.columns), config,
-                                 look_back=config.look_back, look_forward=config.look_forward)
+    validate_dataset = [MyDataset(pd.DataFrame(scaled_data_validate, columns=data.columns), config,
+                                 look_back=config.look_back, look_forward=look_forward) for look_forward in config.test_look_forward]
 
-    test_dataset = MyDataset(pd.DataFrame(scaled_data_test, columns=data.columns), config,
-                             look_back=config.look_back, look_forward=config.test_look_forward)
+    test_dataset = [MyDataset(pd.DataFrame(scaled_data_test, columns=data.columns), config,
+                             look_back=config.look_back, look_forward=look_forward) for look_forward in config.test_look_forward]
 
-    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
-    val_loader = DataLoader(validate_dataset, batch_size=config.batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
+
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=16)
+    val_loader = [DataLoader(x, batch_size=config.batch_size, shuffle=False) for x in validate_dataset]
+    test_loader = [DataLoader(x, batch_size=config.batch_size, shuffle=False) for x in test_dataset]
     return data, scaled_data, train_loader, val_loader, test_loader
 

@@ -10,22 +10,33 @@ import torch
 
 
 def initialize_model(config):
+    from models.mimo import MIMO
+    net = MIMO(k_in=len(config.Control_Col),k_out=len(config.Target_Col), k_state=config.hidden_num, solver=config.ode_method,
+         stationary=config.stationary, interpolation=config.interpolation, encoder_net_type=config.encoder_rnn,
+         net_type=config.net_type, adjoint=config.adjoint)
 
-    if config.algorithm == 'diff':
-        from models.diff import DiffNet as SeriesNet
-    elif config.algorithm == 'ode':
-        from models.ode import MyODE as SeriesNet
-    elif config.algorithm == 'ode_affine':
-        from models.ode_affine_linear import MyODEAffine as SeriesNet
-    elif config.algorithm == 'hidden_rnn':
-        from models.hidden_rnn import HiddenRNN as SeriesNet
-    elif config.algorithm.startswith('RK'):
-
-        from models.RK import RK as SeriesNet
-    else:
-        raise AttributeError
-
-    net = SeriesNet(input_size=len(config.Target_Col+config.Control_Col),
-                    num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(config.Target_Col),
-                    config=config, net_type=config.net_type)
+    # if config.algorithm == 'diff':
+    #     from models.diff import DiffNet as SeriesNet
+    # elif config.algorithm == 'ode':
+    #     if config.ode_version == '1':
+    #         from models.ode import MyODE as SeriesNet
+    #     elif config.ode_version == '2':
+    #         from models.ode_v2 import MyODEV2 as SeriesNet
+    #     else:
+    #         print(config.ode_version + 'is not defined')
+    #
+    #
+    # elif config.algorithm == 'ode_affine':
+    #     from models.ode_affine_linear import MyODEAffine as SeriesNet
+    # elif config.algorithm == 'hidden_rnn':
+    #     from models.hidden_rnn import HiddenRNN as SeriesNet
+    # elif config.algorithm.startswith('RK'):
+    #
+    #     from models.RK import RK as SeriesNet
+    # else:
+    #     raise AttributeError
+    #
+    # net = SeriesNet(input_size=len(config.Target_Col+config.Control_Col),
+    #                 num_layers=config.num_layers, hidden_size=config.hidden_num, out_size=len(config.Target_Col),
+    #                 config=config, net_type=config.net_type)
     return net
