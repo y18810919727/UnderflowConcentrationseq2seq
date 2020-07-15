@@ -13,7 +13,7 @@ def initialize_model(config):
     from models.mimo import MIMO
     net = MIMO(k_in=len(config.Control_Col),k_out=len(config.Target_Col), k_state=config.hidden_num, solver=config.ode_method,
          stationary=config.stationary, interpolation=config.interpolation, encoder_net_type=config.encoder_rnn,
-         net_type=config.net_type, adjoint=config.adjoint)
+         net_type=config.net_type, adjoint=config.adjoint, ut=config.t_step)
 
     # if config.algorithm == 'diff':
     #     from models.diff import DiffNet as SeriesNet
