@@ -11,7 +11,9 @@ import argparse
 from common import MyWriter
 DATA_PATH = './data/res_all_selected_features_0.csv'
 # DATA_PATH = './data/data_example.csv'
-
+action_1 = [-1.76, 1.48]  # 3.24
+action_2 = [-2.98, 0.66]  # 3.64
+action_3 = [-1.39, 3.78]  # 5.03
 
 parser = argparse.ArgumentParser(description='seq2seq Data-driven Thickener Simulator')
 parser.add_argument('--use_cuda', action='store_true', default=False)
@@ -40,10 +42,8 @@ parser.add_argument('--is_train', type=str, default=False)
 parser.add_argument('--test_all', action='store_true', default=False)
 parser.add_argument('--random_seed', type=int, default=None)
 parser.add_argument('--nou', action='store_true', default=False)
-parser.add_argument('--t_step', type=float, default=1)
-
-parser.add_argument('--encoder_rnn', type=str, default='GRU', help='rnn or lstm or GRU')
-
+parser.add_argument('--t_step', type=float, default=0.1666667)
+parser.add_argument('--encode_rnn', type=str, default='rnn', help='rnn or lstm or GRU')
 
 parser.add_argument('--data_inv', action='store_true', default=False)
 parser.add_argument('--rtol', type=str, default='3')
@@ -72,14 +72,19 @@ parser.add_argument('--Control_Col', type=list, default=['4','5','7','15','16'])
 parser.add_argument('--controllable', type=list, default=['5','7','15'])
 parser.add_argument('--uncontrollable', type=list, default=['4', '16'])
 parser.add_argument('--all_col', type=list, default=['1','4','5','7','11','15','16','17','18','19','20','21','22'])
+
 parser.add_argument('--con_batch_size', type=int, default=1)
-parser.add_argument('--y_target', type=list, default=[63, 32])
+parser.add_argument('--y_target', type=list, default=[66, 32])
 parser.add_argument('--constant_noise', type=int, default=0)
 parser.add_argument('--is_write', type=int, default=1)
 parser.add_argument('--x_decode', type=int, default=1)
 parser.add_argument('--phi_input', type=int, default=1)
 parser.add_argument('--mpc_control', type=int, default=1)
 parser.add_argument('--action_constraint', type=int, default=0)
+parser.add_argument('--noise_narrow', type=int, default=1)
+parser.add_argument('--cal_u', type=int, default=0)
+parser.add_argument('--noise_pre', type=int, default=1)
+
 
 args = parser.parse_args()
 if args.dataset_name == 'cstr':

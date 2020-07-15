@@ -3,11 +3,21 @@ import random
 import torch
 from config import args
 
+
+def pos_linear_tran(x):
+    y = x.mul(torch.FloatTensor([1.62, 1.82, 2.52])) + torch.FloatTensor([-0.14, -1.16, 1.26 ])
+    return y
+
+
+def vel_linear_tran(x):
+    y = x.mul(torch.FloatTensor([1, 1.12, 1.55]))
+    return y
+
 class Particle:
     # 初始化
     def __init__(self, x_max, max_vel, dim):
-        self.__pos = torch.FloatTensor([random.uniform(-x_max, x_max) for i in range(dim)])  # 粒子的位置
-        self.__vel = torch.FloatTensor([random.uniform(-max_vel, max_vel) for i in range(dim)])  # 粒子的速度
+        self.__pos = pos_linear_tran(torch.FloatTensor([random.uniform(-x_max, x_max) for i in range(dim)]))  # 粒子的位置
+        self.__vel = vel_linear_tran(torch.FloatTensor([random.uniform(-max_vel, max_vel) for i in range(dim)])) # 粒子的速度
         self.__bestPos = torch.FloatTensor([0.0 for i in range(dim)])  # 粒子最好的位置
         # self.__fitnessValue = fit_fun(self.__pos)  # 适应度函数值
     def set_pos(self, value):
@@ -47,17 +57,17 @@ class PSO:
         self.max_vel = max_vel  # 粒子最大速度
         self.model_pre = model_pre
         self.best_fitness_value = best_fitness_value
-        self.best_position = torch.FloatTensor([0.0 for i in range(dim)])  # 种群最优位置
+        self.best_position = torch.FloatTensor([1.6, 1.8, 2.5])  # 种群最优位置
         # self.fitness_val_list = []  # 每次迭代最优适应值
         self.error_limit = error_limit
 
         self.x = self.model_pre.x
         self.y_target = self.model_pre.scaler.scale_target(torch.FloatTensor(args.y_target))
         self.Q = torch.diag(torch.FloatTensor([10.0, 0.001]))
-        self.R = torch.diag(torch.FloatTensor([0.001, 0.01, 0.1]))
+        self.R = torch.diag(torch.FloatTensor([0.001, 0.001, 0.001]))
 
-        self.u_min = [-1.76, -2.98, -1.39]
-
+        self.u_range = [(-1.76, 1.48), (-2.98, 0.66), (-1.39, 3.78)]
+        self.max_vel_range = [self.max_vel, self.max_vel*1.12, self.max_vel*1.55]
 
     def set_bestFitnessValue(self, value):
         self.best_fitness_value = value
@@ -71,21 +81,14 @@ class PSO:
     def get_bestPosition(self):
         return self.best_position
 
-    def penalty(self, u):
-        p = 0
-        for i in range(self.dim):
-            if u[0][i] < self.u_min[i]:
-                p = p + 10
-        return p
-
-    def fit_fun(self, du):
-        du = torch.unsqueeze(du, dim=0)
-        u = self.last_u + du
-        y = self.model_pre.f_pre(self.x, u)
+    def fit_fun(self, u):
+        u = torch.unsqueeze(u, dim=0)
+        du = self.last_u - u
+        y, dx_dt = self.model_pre.f_pre(self.x, u)
         y_det = y - self.y_target
         y_cost = torch.sum(y_det @ self.Q @ y_det.T, dim=1)
         u_cost = torch.sum(du @ self.R @ du.T, dim=1)
-        cost = (y_cost + u_cost).data.numpy()[0] + self.penalty(u)
+        cost = (y_cost + u_cost).data.numpy()[0]
         return cost
 
     # 更新速度
@@ -94,10 +97,10 @@ class PSO:
         vel_value = self.W * part.get_vel() + self.C1 * torch.rand(3).mul(part.get_best_pos() - part.get_pos()) \
                     + self.C2 * torch.rand(3).mul(self.get_bestPosition() - part.get_pos())
         for i in range(self.dim):
-            if vel_value[i] > self.max_vel:
-                vel_value[i] = self.max_vel
-            elif vel_value[i] < -self.max_vel:
-                vel_value[i] = -self.max_vel
+            if vel_value[i] > self.max_vel_range[i]:
+                vel_value[i] = self.max_vel_range[i]
+            elif vel_value[i] < -self.max_vel_range[i]:
+                vel_value[i] = -self.max_vel_range[i]
         part.set_vel(vel_value)
 
     # 更新位置
