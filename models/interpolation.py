@@ -35,7 +35,7 @@ class Interpolation(nn.Module):
             order = 0
         else:
             raise NotImplemented('Interpolation method - {} is not been implemented'.format(self.method))
-        return order
+        return min(order, self.len-1)
 
     def expand_t(self, t):
         return torch.stack([t ** o for o in range(self.order + 1)], dim=-1)
@@ -44,14 +44,17 @@ class Interpolation(nn.Module):
         eps = 1e-9
         #x_target = (t - self.min_t) / (self.max_t - self.min_t) * (self.len - 1)
         x1 = torch.LongTensor([x_target + eps]).squeeze()
+        x_target = torch.LongTensor([x_target]).squeeze()
         x1 -= min(x1, max(x1 + self.order - self.len + 1, 0))
         # while x1>=1 and x_right >= self.len:
         #     x1 -= 1
         #     x_right = x1 + self.order
         if self.order == 0:
-            if x_target - x1 < x1 + 1 - x_target:
+            if x_target - x1 > x1 + 1 - x_target:
                 x1 = x1 + 1
         xs = torch.linspace(x1, x1 + self.order, self.order + 1).to(self.x.device)
+        # import pdb
+        # pdb.set_trace()
         ps = torch.stack([self.x[int(x_ind)].contiguous().reshape(self.batch_size * self.x_size) for x_ind in xs], dim=0)
         return xs, ps
 

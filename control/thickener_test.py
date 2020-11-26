@@ -22,7 +22,8 @@ model_dic = {
     'model2': './ckpt/GRU_ode_3_4_h32_cubic_dopri5/best.pth',
     'model3': './ckpt/rnn_ode_affine_3_4_cubic_transform/best.pth',
     'model4': './ckpt/rnn_ode_affine_3_4_cubic_full/best.pth',
-    'model5': './ckpt/rnn_ode_affine_3_4_cubic_transform_full/best.pth'
+    'model5': './ckpt/rnn_ode_affine_3_4_cubic_transform_full/best.pth',
+    'model6': '/ckpt/GRU_sta_euler_b20_f15/best.pth'
 }
 
 
@@ -51,7 +52,10 @@ def model_test():
 
     net = initialize_model(config=model_config)
 
-    net.load_state_dict(state_dic['net'])
+    if 'net' in state_dic.keys():
+        net.load_state_dict(state_dic['net'])
+    else:
+        net.load_state_dict(state_dic['net15'])
     net.ode_net.interpolation_kind = 'slinear'
     # 自定义数据归一化工具
     _mean, _var = state_dic['scaler_mean'], state_dic['scaler_var']

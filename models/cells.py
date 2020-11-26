@@ -11,6 +11,27 @@ import torch
 from torch import nn
 
 
+class InitialHidden(nn.Module):
+
+    def __init__(self, input_size, hidden_size, *args, **kwargs):
+        super(InitialHidden, self).__init__()
+        self.hidden_size = hidden_size
+        self.begin_state = torch.nn.Parameter(torch.randn(hidden_size))
+    def forward(self, x):
+        _, bs, _=x.shape
+        hn = self.begin_state.repeat(bs, 1).unsqueeze(dim=0).to(x.device)
+        output = hn
+        return output, hn
+
+class ZeroHidden(nn.Module):
+    def __init__(self, input_size, hidden_size, *args, **kwargs):
+        super(ZeroHidden, self).__init__()
+        self.hidden_size = hidden_size
+    def forward(self, x):
+        _, bs, _ = x.shape
+        hn = torch.zeros((1, bs, self.hidden_size)).to(x.device)
+        return None, hn
+
 class ASLinear(nn.Linear):
 
     def __init__(self, features, bias=True, gamma=0.01):

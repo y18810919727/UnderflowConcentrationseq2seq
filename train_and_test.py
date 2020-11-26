@@ -43,11 +43,9 @@ def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_vi
     if use_cuda:
         net = net.cuda()
 
-    acc_time = 0
     for i, data in enumerate(test_loader):
-        # todo
-        if i!=0:
-            continue
+        # if i!=0:
+        #     continue
         time_point = time.time()
         pre_x, pre_y, forward_x, forward_y = data
         pre_x = pre_x.permute(1,0,2)
@@ -94,9 +92,8 @@ def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_vi
         if tb_visualize:
             for y_index in range(len(config.Target_Col)):
                 for series_index in range(min(config.batch_size, pre_x.shape[1])):
-                    # todo
-                    if series_index != 1:
-                        continue
+                    # if series_index != 1:
+                    #     continue
 
 
                     fig = plt.figure(figsize=(5, 4))
@@ -120,9 +117,9 @@ def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_vi
                     #                     labels=y_series[:, series_index, y_index],
                     #                     global_step=epoch,
                     #                     )
-                    plt.savefig('expresults/figs/'+str(y_series.shape[0])+'/' + data_loader_name+'_'+name[y_index] + '_' +config.save_dir
-                                +'.eps', dpi=600)
-                    #writer.add_figure(data_loader_name + os.path.join(name[y_index], str(i), str(series_index), str(y_series.shape[0])), fig, global_step=epoch)
+                    # plt.savefig('expresults/figs/'+str(y_series.shape[0])+'/' + data_loader_name+'_'+name[y_index] + '_' +config.save_dir
+                    #             +'.eps', dpi=600)
+                    writer.add_figure(data_loader_name + os.path.join(name[y_index], str(i), str(series_index), str(y_series.shape[0])), fig, global_step=epoch)
                     plt.close()
                     fig.clf()
 
@@ -163,7 +160,7 @@ def train_net(net, train_loader, val_loader, test_loader, logging, config):
         sigma_optim = torch.optim.Adam([critic.sigma])
 
 
-    optim = torch.optim.Adam(net.parameters(), lr=0.001)
+    optim = torch.optim.Adam(net.parameters(), lr=config.lr)
     schedualer = torch.optim.lr_scheduler.StepLR(optim, step_size=50, gamma=0.95, last_epoch=-1)
 
     from common import MyWriter
@@ -297,7 +294,7 @@ def train_net(net, train_loader, val_loader, test_loader, logging, config):
             # writer.add_scalars('test_MSE', test_mse, epoch)
             #writer.add_scalar('val_MSE', total_val_MSE, epoch)
             writer.add_scalar('val_time', sum_time, epoch)
-            val_RRSE_list.append(val_rrse[config.cmp_length])
+            val_RRSE_list.append(val_rrse)
 
             # logging('\nepoch %04d | loss %.3f | val rrse %.3f | test rrse %.3f '%
             #         (epoch, total_train_loss/total_train_items, val_rrse[config.cmp_length], test_rrse[config.cmp_length]))
@@ -307,7 +304,7 @@ def train_net(net, train_loader, val_loader, test_loader, logging, config):
                 cmp_length = str(cmp_length)
                 if val_rrse[cmp_length] < best_RRSE[cmp_length]:
                     best_RRSE[cmp_length] = val_rrse[cmp_length]
-                    best_info = (epoch, total_train_loss/total_train_items, val_rrse[config.cmp_length], test_rrse[config.cmp_length])
+                    best_info = (epoch, total_train_loss/total_train_items, val_rrse[str(config.cmp_length)], test_rrse[str(config.cmp_length)])
                     best_ckpt['net'+str(cmp_length)] = copy.deepcopy(net.state_dict())
                     best_ckpt['epoch'+str(cmp_length)] = epoch
                     update_ckpt = True
@@ -323,7 +320,7 @@ def train_net(net, train_loader, val_loader, test_loader, logging, config):
         os.makedirs('./ckpt/'+config.save_dir)
     torch.save(best_ckpt, os.path.join('ckpt', config.save_dir, 'best')+'.pth')
     logging('best loss = {:.4f} in epoch = {} with train_loss = {:.4f} with  val rrse = {:.4f} with test rrse = {:.4f}'.format(
-        best_RRSE[config.cmp_length], best_info[0], best_info[1], best_info[2], best_info[3]
+        best_RRSE[str(config.cmp_length)], best_info[0], best_info[1], best_info[2], best_info[3]
     ))
     return net, train_loss_list, val_RRSE_list
 

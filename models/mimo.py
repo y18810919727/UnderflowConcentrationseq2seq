@@ -11,6 +11,7 @@ from torch import nn
 
 
 from models.interpolation import Interpolation, EmptyInterpolation
+from models.cells import *
 
 
 
@@ -46,6 +47,8 @@ class MIMO(nn.Module):
             'RNN': nn.RNN,
             'LSTM': nn.LSTM,
             'GRU': nn.GRU,
+            'zero_st': ZeroHidden,
+            'learn_st': InitialHidden
         }
         self.rnn_encoder = encoder_net_class_dict[encoder_net_type](input_size=k_in + k_out, hidden_size=k_state, num_layers=encoder_layers)
         self.fc = torch.nn.Sequential(
@@ -95,7 +98,6 @@ class MIMO(nn.Module):
 
         self.ode_net = OdeSystem(cell, self.expand_input, stationary=stationary, ut=ut)
 
-
     def recursive_predict(self, hn_seq, max_len=50):
 
         len, bs, hidden_size = hn_seq.shape
@@ -112,6 +114,10 @@ class MIMO(nn.Module):
 
     def forward(self, input, dt=0.1):
         pre_x, pre_y, forward_x = input
+
+        if pre_x.shape[0] == 0:
+            pre_x = torch.zeros((1, pre_x.shape[1], pre_x.shape[2])).to(forward_x.device)
+            pre_y = torch.zeros((1, pre_y.shape[1], pre_y.shape[2])).to(forward_x.device)
         _, hn = self.rnn_encoder(torch.cat([pre_x, pre_y], dim=2)) # hn (1, batch_size, hidden_num)
         t = torch.linspace(0, dt * forward_x.shape[0], forward_x.shape[0]+1).to(pre_x.device)
         interpolation = Interpolation(

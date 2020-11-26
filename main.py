@@ -58,11 +58,13 @@ def main(config):
     if config.is_train:
         from common import SimpleLogger
         logging = SimpleLogger(os.path.join('ckpt', config.save_dir, 'log.out'))
+        logging('save_dir: %s' % config.save_dir)
         try:
             net, train_loss_list, val_loss_list = train_net(net, train_loader, val_loader, test_loader, logging, config)
         except Exception as e:
             var = traceback.format_exc()
             logging(var)
+
     # elif config.test_all:
     #
     #     state = torch.load(os.path.join('ckpt', config.save_dir, str(config.test_model)+'.pth'))

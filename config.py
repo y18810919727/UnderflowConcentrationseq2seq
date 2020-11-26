@@ -24,31 +24,31 @@ parser.add_argument('--net_type', type=str, default='rnn')
 parser.add_argument('--algorithm', type=str, default='ode')
 parser.add_argument('--hidden_num', type=int, default=16)
 parser.add_argument('--num_layers', type=int, default=1)
-parser.add_argument('--look_back', type=int, default=160)
-parser.add_argument('--look_forward', type=int, default=60)
-parser.add_argument('--test_look_forward', type=list, default=[20, 200, 500])
+parser.add_argument('--look_back', type=int, default=20)
+parser.add_argument('--look_forward', type=int, default=15)
+parser.add_argument('--test_look_forward', type=list, default=[15, 50, 125])
 #parser.add_argument('--test_look_forward', type=list, default=[60, 200, 1000])
 
 
-parser.add_argument('--cmp_length', type=str, default='500')
+parser.add_argument('--cmp_length', type=str, default='15')
 parser.add_argument('--sample_dis', type=int, default=1)
 parser.add_argument('--epochs', type=int, default=300)
 parser.add_argument('--save_dir', type=str, default='')
 parser.add_argument('--batch_size', type=int, default=16)
 parser.add_argument('--test_period', type=int, default=20)
-parser.add_argument('--lr', type=float, default=1e-4)
+parser.add_argument('--lr', type=float, default=5e-4)
 parser.add_argument('--test_model', type=str, default='0')
 parser.add_argument('--is_train', type=str, default=False)
 parser.add_argument('--test_all', action='store_true', default=False)
 parser.add_argument('--random_seed', type=int, default=None)
 parser.add_argument('--nou', action='store_true', default=False)
 parser.add_argument('--t_step', type=float, default=0.1666667)
-parser.add_argument('--encode_rnn', type=str, default='rnn', help='rnn or lstm or GRU')
+parser.add_argument('--encoder_rnn', type=str, default='RNN', help='RNN or LSTM or GRU or zero_st or learn_st')
 
 parser.add_argument('--data_inv', action='store_true', default=False)
-parser.add_argument('--rtol', type=str, default='3')
-parser.add_argument('--atol', type=str, default='4')
-parser.add_argument('--interpolation', type=str, default="quadratic", help="slinear, quadratic, cubic")
+parser.add_argument('--rtol', type=str, default='4')
+parser.add_argument('--atol', type=str, default='5')
+parser.add_argument('--interpolation', type=str, default="quadratic", help="zero, slinear, quadratic, cubic")
 parser.add_argument('--begin', type=str, default="GRU_st", help="rnn_st, zero_st, learn_st")
 parser.add_argument('--ode_method', type=str, default="dopri5", help="methods for computing ode")
 parser.add_argument('--stationary', action='store_true', help="the property of ode system")
@@ -58,7 +58,7 @@ parser.add_argument('--adjoint', action='store_true',
 
 #parser.add_argument('--DATA_PATH', type=str, default='./data/res_all_selected_features_half.csv')
 parser.add_argument('--DATA_PATH', type=str, default='./data/res_all_selected_features_0.csv')
-parser.add_argument('--data_half', action='store_true', default=True, help='double data separation')
+parser.add_argument('--data_choice', type=str, default='quarter')
 parser.add_argument('--test_re', type=str, default='*')
 parser.add_argument('--plot', type=str, default='')
 
@@ -96,8 +96,18 @@ if args.dataset_name == 'cstr':
     args.DATA_PATH = './data/cstr.csv'
     args.save_dir = 'cstr'+args.save_dir
 else:
-    if args.data_half:
+    if args.data_choice == 'half':
         args.DATA_PATH = './data/res_all_selected_features_half.csv'
+        # args.look_back = 40
+        # args.look_forward = 30
+        # args.test_look_forward = [30, 100, 250]
+        # args.cmp_length = 30
+    elif args.data_choice == 'quarter':
+        args.DATA_PATH = './data/res_all_selected_features_quarter.csv'
+        # args.look_back = 20
+        # args.look_forward = 15
+        # args.test_look_forward = [15, 50, 125]
+        # args.cmp_length = 15
 
 
 if args.epochs == 0:
@@ -130,6 +140,7 @@ if args.stationary:
 else:
     args.save_dir = args.save_dir + '_nonsta'
 args.save_dir = args.save_dir + '_' + args.ode_method
+args.save_dir = args.save_dir + '_b' + str(args.look_back) + '_f' + str(args.look_forward)
 import time
 
 if not os.path.exists('logs'):
