@@ -54,6 +54,7 @@ parser.add_argument('--ode_method', type=str, default="dopri5", help="methods fo
 parser.add_argument('--stationary', action='store_true', help="the property of ode system")
 parser.add_argument('--adjoint', action='store_true',
                     help="Choose to use adjoint sensitivity method  or not to backward ode-net")
+parser.add_argument('--max_length_encoder', type=int, default=80)
 
 
 #parser.add_argument('--DATA_PATH', type=str, default='./data/res_all_selected_features_half.csv')
@@ -135,11 +136,12 @@ if args.nou:
     args.save_dir = args.save_dir + '_nou'
 if args.is_train and args.test_all:
     raise AttributeError('Can not test all in training phase.')
-if args.stationary:
-    args.save_dir = args.save_dir + '_sta'
-else:
-    args.save_dir = args.save_dir + '_nonsta'
-args.save_dir = args.save_dir + '_' + args.ode_method
+if args.algorithm == 'ode':
+    if args.stationary:
+        args.save_dir = args.save_dir + '_sta'
+    else:
+        args.save_dir = args.save_dir + '_nonsta'
+    args.save_dir = args.save_dir + '_' + args.ode_method
 args.save_dir = args.save_dir + '_b' + str(args.look_back) + '_f' + str(args.look_forward)
 import time
 

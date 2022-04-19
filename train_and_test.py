@@ -87,7 +87,7 @@ def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_vi
                 name = ['UC', 'Pressure']
                 unit_name = ['%', 'Mpa']
         elif config.dataset_name == 'cstr':
-            name = ['Concentration', 'Tenp']
+            name = ['Concentration', 'Temp']
             unit_name = ['%', 'C']
         if tb_visualize:
             for y_index in range(len(config.Target_Col)):
@@ -141,6 +141,7 @@ def test_net(net, test_loader, config, writer, critic_func=None, epoch=0, plt_vi
 
     used_time['evaluation and visualization'] += time.time() - time_point
     return total_test_loss, total_test_items, used_time
+
 
 def train_net(net, train_loader, val_loader, test_loader, logging, config):
 
@@ -228,15 +229,18 @@ def train_net(net, train_loader, val_loader, test_loader, logging, config):
             # bar.set_description("compute efficiency: {:.2f}%, process time: {:.2f}s, epoch: {}/{}".format(
             #     100*process_time/(process_time+prepare_time),process_time ,epoch, config.epochs)
             # )
-            logging("epoch: {}/{}, batch: {}/{}, train loss: {}, cal times: {} compute efficiency: {:.2f}%, process time: {:.2f}s, ".format(
-                epoch, config.epochs, i, len(train_loader),float(loss), net.ode_net.cell.call_times,
-                100*process_time/(process_time+prepare_time),process_time )
-            )
+            if config.algorithm == 'ode':
+                logging("epoch: {}/{}, batch: {}/{}, train loss: {}, cal times: {} compute efficiency: {:.2f}%, process time: {:.2f}s, ".format(
+                    epoch, config.epochs, i, len(train_loader),float(loss), net.ode_net.cell.call_times,
+                    100*process_time/(process_time+prepare_time),process_time )
+                )
+            else:
+                logging("epoch: {}/{}, batch: {}/{}, train loss: {}, compute efficiency: {:.2f}%, process time: {:.2f}s, ".format(
+                    epoch, config.epochs, i, len(train_loader),float(loss),
+                    100*process_time/(process_time+prepare_time),process_time )
+                )
             #print("compute efficiency: {:.2f}, epoch: {}/{}".format(process_time/(process_time+prepare_time), epoch, config.epochs))
             start_time = time.time()
-
-
-
 
         writer.add_scalar('train_loss', total_train_loss/total_train_items, epoch)
         if config.loss_func =='gauss':
@@ -275,7 +279,8 @@ def train_net(net, train_loader, val_loader, test_loader, logging, config):
                     logging('Test in Epoch {:04d} | forward len {:04d} | call times {} | Time {:.2f} \
                             | pre {:.2f}-{:.1f}% | forward {:.2f}-{:.1f}% | eval {:.2f}-{:.1f}% \
                             | val error{:.2f} | test error {:.2f}'.format(
-                        epoch, forward_length, net.ode_net.cell.call_times,sum_time, used_time['prepare data'], 100*used_time['prepare data']/sum_time,
+                        epoch, forward_length, net.ode_net.cell.call_times if config.algorithm == 'ode' else 0,
+                        sum_time, used_time['prepare data'], 100*used_time['prepare data']/sum_time,
                         used_time['forward'], 100*used_time['forward']/sum_time,
                         used_time['evaluation and visualization'], 100*used_time['evaluation and visualization']/sum_time,
                         val_error['RRSE'], test_error['RRSE']
@@ -312,7 +317,7 @@ def train_net(net, train_loader, val_loader, test_loader, logging, config):
                 epoch_stable = 0
             else:
                 epoch_stable += 1
-            if epoch_stable > 10:
+            if epoch_stable > 5:
                 logging('Early stop in epoch %04d.' % epoch)
                 break
 

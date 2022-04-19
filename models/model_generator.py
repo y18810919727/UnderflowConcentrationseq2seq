@@ -11,9 +11,21 @@ import torch
 
 def initialize_model(config):
     from models.mimo import MIMO
-    net = MIMO(k_in=len(config.Control_Col),k_out=len(config.Target_Col), k_state=config.hidden_num, solver=config.ode_method,
-         stationary=config.stationary, interpolation=config.interpolation, encoder_net_type=config.encoder_rnn,
-         net_type=config.net_type, adjoint=config.adjoint, ut=config.t_step)
+
+    if config.algorithm == 'ode':
+        net = MIMO(k_in=len(config.Control_Col),k_out=len(config.Target_Col), k_state=config.hidden_num, solver=config.ode_method,
+             stationary=config.stationary, interpolation=config.interpolation, encoder_net_type=config.encoder_rnn,
+             net_type=config.net_type, adjoint=config.adjoint, ut=config.t_step)
+    elif config.algorithm == 'seq2seq':
+        from models.seq2seq import AttentionSeq2Seq
+        net = AttentionSeq2Seq(k_in=len(config.Control_Col), k_out=len(config.Target_Col),
+                               k_state=config.hidden_num, max_length=config.max_length_encoder,
+                               num_layers=config.num_layers)
+    elif config.algorithm == 'ss':
+        from models.state_space import StateSpace
+        net = StateSpace(k_in=len(config.Control_Col), k_out=len(config.Target_Col),
+                               k_state=config.hidden_num, max_length=config.max_length_encoder,
+                               )
 
     # if config.algorithm == 'diff':
     #     from models.diff import DiffNet as SeriesNet

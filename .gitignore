@@ -116,3 +116,4 @@ venv.bak/
 !/data/data_example.csv
 /ckpt/add_scaler.py
 /logs/
+/jupyter/*

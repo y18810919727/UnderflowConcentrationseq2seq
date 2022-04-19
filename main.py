@@ -31,8 +31,6 @@ from models.model_generator import initialize_model
 from custom_dataset import initialize_dataset
 
 
-
-
 def set_random_seed(config):
 
     if config.random_seed is None:
@@ -43,10 +41,6 @@ def set_random_seed(config):
     np.random.seed(rand_seed)
     torch.manual_seed(rand_seed)
     torch.cuda.manual_seed(rand_seed)
-
-
-
-
 
 
 def main(config):

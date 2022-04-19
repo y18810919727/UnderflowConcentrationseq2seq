@@ -93,6 +93,17 @@ def make_fcn(input_size, num_layers, hidden_size, out_size):
 def col2Index(all_col, col):
     return [list(all_col).index(x) for x in col]
 
+
+def RMSE(y_pred, y_gt):
+    return torch.sqrt(torch.mean(
+        (y_pred - y_gt)**2
+    ))
+
+def MSE(y_pred, y_gt):
+    return torch.mean(
+        (y_pred - y_gt)**2
+    )
+
 def RRSE(y_pred, y_gt):
     assert y_gt.shape == y_pred.shape
     if len(y_gt.shape) == 3:
